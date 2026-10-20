@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Streaming Observability — End-to-End Data Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16202B; --ink-2:#4A5A6A; --ink-3:#78868F;
+  --paper:#F3F6F7; --surface:#FFFFFF; --surface-2:#EAEFF2; --surface-3:#DFE6EA;
+  --line:#DBE3E7; --line-2:#BFCAD2;
+  --accent:#0E7C86; --accent-soft:#D8ECEE;
+  --good:#3B8A6B; --bad:#BF4E3E; --warn:#A87526; --violet:#6A5AA8; --blue:#2D6CA8;
+  --good-soft:#DCEDE4; --bad-soft:#F7E1DC; --warn-soft:#F4E9D4; --violet-soft:#E6E2F2; --blue-soft:#DDE9F4;
+  --code-bg:#101A24; --code-ink:#C8D6E0; --code-dim:#6F8496;
+  --hero-bg:#0F1A24; --hero-ink:#E6EDF2; --hero-ink-2:#8FA3B2; --hero-line:#26343F;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ink:#DEE5EA; --ink-2:#9BABB8; --ink-3:#71818E;
+    --paper:#0B131A; --surface:#141F29; --surface-2:#1A2733; --surface-3:#22303C;
+    --line:#26333F; --line-2:#3A4A58;
+    --accent:#45B4BD; --accent-soft:#12333A;
+    --good:#61B892; --bad:#E27C68; --warn:#D2A356; --violet:#9A8CD6; --blue:#68A2D8;
+    --good-soft:#142D24; --bad-soft:#341915; --warn-soft:#332714; --violet-soft:#1F1C33; --blue-soft:#122536;
+    --code-bg:#080F16; --code-ink:#C2D1DC;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#DEE5EA; --ink-2:#9BABB8; --ink-3:#71818E;
+  --paper:#0B131A; --surface:#141F29; --surface-2:#1A2733; --surface-3:#22303C;
+  --line:#26333F; --line-2:#3A4A58;
+  --accent:#45B4BD; --accent-soft:#12333A;
+  --good:#61B892; --bad:#E27C68; --warn:#D2A356; --violet:#9A8CD6; --blue:#68A2D8;
+  --good-soft:#142D24; --bad-soft:#341915; --warn-soft:#332714; --violet-soft:#1F1C33; --blue-soft:#122536;
+  --code-bg:#080F16; --code-ink:#C2D1DC;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0; background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased}
+.mono,code,pre{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.wrap{max-width:1120px; margin:0 auto; padding:0 clamp(1rem,4vw,2.2rem)}
+
+/* hero */
+.hero{background:var(--hero-bg); color:var(--hero-ink); padding:clamp(2.2rem,5vw,3.6rem) 0 clamp(1.8rem,4vw,2.8rem)}
+h1{font-size:clamp(1.8rem,4.6vw,3rem); line-height:1.05; letter-spacing:-.028em; font-weight:600; margin:0 0 .6rem; max-width:20ch}
+.lede{color:var(--hero-ink-2); max-width:62ch; margin:0 0 2rem; font-size:clamp(.95rem,1.8vw,1.08rem)}
+.lede b{color:var(--hero-ink); font-weight:500}
+
+/* pipeline map */
+.pipe{display:grid; grid-template-columns:repeat(auto-fit,minmax(122px,1fr)); gap:.5rem; margin-top:.5rem}
+.st{background:#17242F; border:1px solid var(--hero-line); border-radius:3px; padding:.62rem .6rem; position:relative}
+.st .k{font-size:.64rem; color:var(--hero-ink-2); font-family:"IBM Plex Mono",monospace; margin-bottom:.22rem}
+.st .t{font-size:.83rem; font-weight:500; line-height:1.25; margin-bottom:.4rem}
+.st .b{font-family:"IBM Plex Mono",monospace; font-size:.75rem; color:#7FD6C4}
+.st.hi{border-color:#2E6C74; background:#132A30}
+
+/* glossary */
+.g{background:none; border:0; padding:0; font:inherit; color:inherit; cursor:pointer;
+  border-bottom:1px dashed currentColor; opacity:.98; text-align:left}
+.g::after{content:"\2009\24D8"; font-size:.82em; opacity:.6}
+.g:hover,.g:focus-visible{border-bottom-style:solid}
+.byte[data-k]{cursor:pointer; border:0; padding:0; font:inherit}
+.byte[data-k]:hover{outline:2px solid var(--ink); outline-offset:1px}
+#gpanel{position:fixed; left:50%; transform:translateX(-50%) translateY(140%);
+  bottom:1rem; width:min(560px, calc(100vw - 1.6rem)); z-index:90;
+  background:var(--surface); border:1px solid var(--line-2); border-radius:6px;
+  box-shadow:0 10px 34px rgba(0,0,0,.26); padding:.85rem 1rem .9rem;
+  transition:transform .2s ease, opacity .2s ease; opacity:0; pointer-events:none}
+#gpanel.on{transform:translateX(-50%) translateY(0); opacity:1; pointer-events:auto}
+@media (prefers-reduced-motion:reduce){#gpanel{transition:none}}
+#gpanel .gt{font-family:"IBM Plex Mono",monospace; font-size:.82rem; color:var(--accent);
+  font-weight:600; margin:0 2rem .3rem 0}
+#gpanel .gd{font-size:.88rem; line-height:1.55; color:var(--ink); margin:0; max-width:none}
+#gpanel .gx{position:absolute; top:.5rem; right:.6rem; background:none; border:0;
+  color:var(--ink-3); font-size:1.15rem; line-height:1; cursor:pointer; padding:.2rem .35rem}
+.ghint{font-size:.72rem; color:var(--ink-3); margin:.4rem 0 0; font-style:normal}
+
+/* execution zones */
+.st.aux{border-style:dashed; background:transparent; border-color:#3B4A57}
+.st.aux .k{color:#6E8494} .st.aux .t{color:var(--hero-ink-2)} .st.aux .b{color:#8FA3B2}
+.zones{display:grid; gap:.5rem; grid-template-columns:1fr}
+@media(min-width:940px){.zones{grid-template-columns:1.75fr .62fr 2.55fr}}
+.zone{border:1px solid var(--hero-line); border-radius:4px; padding:.5rem .5rem .55rem; position:relative}
+.zone.dev{background:rgba(69,180,189,.07); border-color:#2C5F67}
+.zone.net{background:rgba(210,163,86,.08); border-color:#5E4C29}
+.zone.srv{background:rgba(154,140,214,.08); border-color:#3E3763}
+.zh{display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; margin:0 .15rem .45rem}
+.zh .zn{font-size:.7rem; font-weight:600}
+.zh .zd{font-size:.6rem; color:var(--hero-ink-2); font-family:"IBM Plex Mono",monospace; text-align:right}
+.zone.dev .zn{color:#7FD6C4} .zone.net .zn{color:#E2B778} .zone.srv .zn{color:#B3A6E6}
+.tb{display:flex; align-items:center; gap:.5rem; margin:.7rem 0 .2rem; font-size:.66rem;
+  color:#E2B778; font-family:"IBM Plex Mono",monospace}
+.tb hr{flex:1; border:0; border-top:1px dashed #5E4C29; margin:0}
+.rtn{display:flex; align-items:center; gap:.5rem; margin:.55rem 0 0; font-size:.66rem;
+  color:var(--hero-ink-2); font-family:"IBM Plex Mono",monospace}
+.rtn hr{flex:1; border:0; border-top:1px solid var(--hero-line); margin:0}
+
+/* zone badges on section headers */
+.zb{font-family:"IBM Plex Mono",monospace; font-size:.63rem; padding:.16rem .45rem; border-radius:2px;
+  border:1px solid; margin-left:auto; white-space:nowrap; align-self:center}
+.zb.dev{color:var(--accent); border-color:var(--accent); background:var(--accent-soft)}
+.zb.net{color:var(--warn); border-color:var(--warn); background:var(--warn-soft)}
+.zb.srv{color:var(--violet); border-color:var(--violet); background:var(--violet-soft)}
+.zb.both{color:var(--ink-2); border-color:var(--line-2); background:var(--surface-2)}
+
+/* layout */
+main{padding:clamp(1.6rem,4vw,2.8rem) 0 5rem}
+section{margin:0 0 clamp(2.4rem,5vw,3.6rem); scroll-margin-top:1rem}
+.sh{display:flex; gap:.7rem; align-items:baseline; border-bottom:1px solid var(--line-2); padding-bottom:.5rem; margin:0 0 .5rem}
+.sh h2{font-size:clamp(1.15rem,2.4vw,1.5rem); letter-spacing:-.018em; font-weight:600; margin:0}
+.sh .n{font-family:"IBM Plex Mono",monospace; color:var(--accent); font-weight:500; font-size:.9em; flex:none}
+.sub{color:var(--ink-2); max-width:70ch; margin:.35rem 0 1.15rem; font-size:.95rem}
+h3{font-size:.95rem; font-weight:600; margin:1.6rem 0 .55rem}
+p{margin:0 0 .85rem; max-width:72ch}
+ul{margin:0 0 .9rem; padding-left:1.15rem; max-width:72ch}
+li{margin:0 0 .3rem}
+a{color:var(--accent)}
+
+.card{background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:1rem 1.1rem; margin:0 0 1rem}
+.cap{font-size:.78rem; color:var(--ink-3); margin:.55rem 0 0; max-width:78ch; line-height:1.5}
+.cap b{color:var(--ink-2); font-weight:500}
+.two{display:grid; gap:1rem; grid-template-columns:1fr}
+@media(min-width:860px){.two{grid-template-columns:1fr 1fr}}
+.two-a{display:grid; gap:1rem; grid-template-columns:1fr}
+@media(min-width:900px){.two-a{grid-template-columns:1.15fr .85fr}}
+
+/* code */
+pre{background:var(--code-bg); color:var(--code-ink); border-radius:4px; padding:.85rem .95rem; overflow-x:auto;
+  font-size:.765rem; line-height:1.6; margin:0; border:1px solid #1D2A36}
+pre .c{color:var(--code-dim)}
+pre .k{color:#7FD6C4}
+pre .s{color:#E2B778}
+pre .n{color:#9FB6D0}
+pre .f{color:#D9A7C0}
+pre .hl{background:rgba(127,214,196,.12); display:inline-block; width:100%}
+.lbl{font-size:.7rem; color:var(--ink-3); font-family:"IBM Plex Mono",monospace; margin:0 0 .35rem; display:flex; justify-content:space-between; gap:1rem; align-items:baseline}
+.lbl .sz{color:var(--accent); font-weight:500}
+
+/* tables */
+.tw{overflow-x:auto; border:1px solid var(--line); border-radius:4px; background:var(--surface); margin:0 0 1rem}
+table{border-collapse:collapse; width:100%; font-size:.82rem; min-width:32rem}
+th,td{text-align:left; padding:.5rem .68rem; border-bottom:1px solid var(--line); vertical-align:middle}
+thead th{background:var(--surface-2); font-weight:600; font-size:.75rem; color:var(--ink-2); white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+td.m,th.m{font-family:"IBM Plex Mono",monospace; font-size:.78rem; white-space:nowrap}
+td.r{text-align:right; font-family:"IBM Plex Mono",monospace; font-size:.78rem; white-space:nowrap}
+tr.tot td{font-weight:600; background:var(--surface-2)}
+tr.hlr{background:var(--accent-soft)}
+.bar{height:.55rem; border-radius:1px; background:var(--accent); display:block; min-width:2px}
+.bar.b2{background:var(--bad)} .bar.b3{background:var(--good)} .bar.b4{background:var(--violet)}
+.barcell{width:34%; min-width:110px}
+
+/* byte ladder */
+.ladder{margin:0 0 .6rem}
+.lrow{display:grid; grid-template-columns:minmax(8.5rem,13rem) 1fr minmax(5rem,auto); gap:.7rem; align-items:center; margin-bottom:.4rem; font-size:.82rem}
+.lrow .lb{height:1.05rem; border-radius:2px; display:flex; align-items:center; padding-left:.4rem; font-size:.68rem; color:#fff; font-family:"IBM Plex Mono",monospace; overflow:hidden; white-space:nowrap}
+.lrow .v{font-family:"IBM Plex Mono",monospace; font-size:.78rem; color:var(--ink-2); text-align:right}
+
+/* byte layout */
+.bytes{display:flex; flex-wrap:wrap; gap:3px; margin:0 0 .7rem}
+.byte{width:1.55rem; height:1.55rem; border-radius:2px; display:flex; align-items:center; justify-content:center;
+  font-family:"IBM Plex Mono",monospace; font-size:.58rem; color:#fff}
+.bl{display:flex; flex-wrap:wrap; gap:.5rem .95rem; font-size:.72rem; color:var(--ink-2)}
+.bl i{display:inline-block; width:.62rem; height:.62rem; border-radius:2px; margin-right:.35rem; vertical-align:-1px}
+
+/* event↔field linking */
+.dot{display:inline-block; width:.55rem; height:.55rem; border-radius:50%; margin-right:.4rem; vertical-align:0}
+.evlist{font-family:"IBM Plex Mono",monospace; font-size:.7rem; line-height:1.72; background:var(--code-bg); color:var(--code-ink);
+  border:1px solid #1D2A36; border-radius:4px; padding:.8rem .9rem; overflow-x:auto; white-space:pre}
+.flist{font-family:"IBM Plex Mono",monospace; font-size:.72rem; line-height:1.85; background:var(--surface-2);
+  border:1px solid var(--line); border-radius:4px; padding:.8rem .9rem; overflow-x:auto}
+.flist .fn{color:var(--accent)}
+.flist .fv{color:var(--ink)}
+.flist .fs{color:var(--ink-3); font-size:.92em}
+
+/* notes */
+.note{border-left:3px solid var(--line-2); background:var(--surface); padding:.75rem .95rem; margin:0 0 1rem; border-radius:0 3px 3px 0; font-size:.86rem; max-width:80ch}
+.note p:last-child{margin-bottom:0}
+.note .tg{display:block; font-size:.72rem; font-weight:600; margin-bottom:.25rem; color:var(--ink-3)}
+.note.win{border-left-color:var(--good); background:var(--good-soft)} .note.win .tg{color:var(--good)}
+.note.cost{border-left-color:var(--bad); background:var(--bad-soft)} .note.cost .tg{color:var(--bad)}
+.note.care{border-left-color:var(--warn); background:var(--warn-soft)} .note.care .tg{color:var(--warn)}
+.note.key{border-left-color:var(--accent); background:var(--accent-soft)} .note.key .tg{color:var(--accent)}
+
+/* stage chips */
+.chips{display:flex; flex-wrap:wrap; gap:.4rem; margin:0 0 1rem}
+.chip{font-family:"IBM Plex Mono",monospace; font-size:.7rem; padding:.22rem .5rem; border-radius:2px;
+  background:var(--surface-2); border:1px solid var(--line); color:var(--ink-2)}
+.chip b{color:var(--ink); font-weight:500}
+
+/* svg holders */
+.svgbox{background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:.9rem; overflow-x:auto}
+.svgbox svg{display:block; width:100%; height:auto; min-width:480px}
+
+/* timeline */
+.tl{display:flex; height:2.1rem; border-radius:3px; overflow:hidden; border:1px solid var(--line); min-width:520px}
+.tl div{display:flex; align-items:center; justify-content:center; font-family:"IBM Plex Mono",monospace; font-size:.66rem; color:#fff; overflow:hidden; white-space:nowrap}
+.tlw{overflow-x:auto}
+.tlx{display:flex; min-width:520px; margin-top:.3rem}
+.tlx span{font-family:"IBM Plex Mono",monospace; font-size:.64rem; color:var(--ink-3)}
+
+/* services lane */
+.zone.svc{background:rgba(104,162,216,.08); border-color:#2D4E6E}
+.zone.svc .zn{color:#8DBBE6}
+.zb.svc{color:var(--blue); border-color:var(--blue); background:var(--blue-soft)}
+.zones.row2{margin-top:.5rem}
+@media(min-width:940px){.zones.row2 .zone.svc{grid-column:span 2}}
+.jn{display:flex; align-items:center; gap:.5rem; margin:.55rem 0 0; font-size:.66rem;
+  color:#8DBBE6; font-family:"IBM Plex Mono",monospace}
+.jn span:first-child{white-space:nowrap}
+.jn hr{flex:1; border:0; border-top:1px dashed #2D4E6E; margin:0}
+.lanehead{border:1px solid var(--blue); background:var(--blue-soft); border-radius:4px; padding:.9rem 1.1rem; margin:0 0 clamp(2rem,4vw,2.8rem)}
+.lanehead h2{font-size:clamp(1.05rem,2.2vw,1.3rem); margin:0 0 .35rem; letter-spacing:-.015em; font-weight:600; color:var(--ink)}
+.lanehead p{margin:0; font-size:.9rem; color:var(--ink-2); max-width:78ch}
+td.hot{color:var(--bad); font-weight:600}
+td.warm{color:var(--warn); font-weight:500}
+.mx td{vertical-align:top; font-size:.8rem}
+.mx th{font-size:.72rem}
+footer{border-top:1px solid var(--line); padding:1.8rem 0 3.5rem; color:var(--ink-3); font-size:.82rem}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>One minute of video, end to end</h1>
+    <p class="lede">Follow a single viewer through every hop: what the player emits, what the SDK keeps, what crosses the wire, what lands in the OLAP tables, and how a population incident is detected. Then follow the same minute from the other side of the CDN, where an OpenTelemetry agent on every service node compiles spans into minute records on the same clock and the same bucket ladder. <b>Every byte count below is traced to a concrete record.</b></p>
+    <div class="zones">
+
+      <div class="zone dev">
+        <div class="zh"><span class="zn">ON DEVICE · player SDK</span><span class="zd">stages 01–04</span></div>
+        <div class="pipe">
+          <div class="st"><div class="k">stage 1</div><div class="t">Player events</div><div class="b">10.2 KB/min</div></div>
+          <div class="st"><div class="k">stage 2</div><div class="t">SDK memory</div><div class="b">~1.4 KB resident</div></div>
+          <div class="st hi"><div class="k">stage 3</div><div class="t">Semantic record</div><div class="b">342 B JSON</div></div>
+          <div class="st hi"><div class="k">stage 4</div><div class="t">Packed binary</div><div class="b">24 B</div></div>
+        </div>
+      </div>
+
+      <div class="zone net">
+        <div class="zh"><span class="zn">IN TRANSIT</span><span class="zd">stage 05</span></div>
+        <div class="pipe">
+          <div class="st"><div class="k">stage 5</div><div class="t">Batch on wire</div><div class="b">~78 B/min</div></div>
+        </div>
+      </div>
+
+      <div class="zone srv">
+        <div class="zh"><span class="zn">BACKEND · ingest, storage, analysis</span><span class="zd">stages 06–10, A</span></div>
+        <div class="pipe">
+          <div class="st"><div class="k">stage 6</div><div class="t">Ingest enrich</div><div class="b">46 B in memory</div></div>
+          <div class="st"><div class="k">stage 7</div><div class="t">Raw OLAP table</div><div class="b">7.4 B/row disk</div></div>
+          <div class="st hi"><div class="k">stage 8</div><div class="t">Minute cube</div><div class="b">700 rows/s</div></div>
+          <div class="st aux"><div class="k">shared</div><div class="t">Query service</div><div class="b">dashboards, exports</div></div>
+          <div class="st"><div class="k">stage 9</div><div class="t">Detect + attribute</div><div class="b">2 queries/window</div></div>
+          <div class="st"><div class="k">stage 10</div><div class="t">Alert + targeting</div><div class="b">T+292s</div></div>
+          <div class="st aux"><div class="k">control</div><div class="t">Policy + ruleset store</div><div class="b">→ stage 6 and the SDK</div></div>
+          <div class="st"><div class="k">stage A</div><div class="t">Parquet archive → DuckDB</div><div class="b">~13 GB/day · off-cluster</div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="zones row2">
+      <div class="zone svc">
+        <div class="zh"><span class="zn">SERVICES · OTel agent on every node</span><span class="zd">stages S1–S3</span></div>
+        <div class="pipe">
+          <div class="st"><div class="k">stage S1</div><div class="t">Service spans</div><div class="b">~140k spans/s</div></div>
+          <div class="st hi"><div class="k">stage S2</div><div class="t">Agent minute summary</div><div class="b">~75 series/agent</div></div>
+          <div class="st"><div class="k">stage S3</div><div class="t">OTLP delta metrics</div><div class="b">~23 KB/s fleet</div></div>
+          <div class="st aux"><div class="k">evidence</div><div class="t">Span buffer</div><div class="b">5 min, on node</div></div>
+        </div>
+      </div>
+      <div class="zone srv">
+        <div class="zh"><span class="zn">BACKEND · service cube and the aligned join</span><span class="zd">stages S4–S5</span></div>
+        <div class="pipe">
+          <div class="st"><div class="k">stage S4</div><div class="t">Service cube</div><div class="b">80 rows/s</div></div>
+          <div class="st hi"><div class="k">stage S5</div><div class="t">Minute join</div><div class="b">minute × edge × region</div></div>
+          <div class="st aux"><div class="k">feeds</div><div class="t">Stages 09–10</div><div class="b">corroboration, evidence</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="jn"><span>◆ alignment</span><hr><span>both lanes seal on the same UTC minute, bucket durations on one shared ladder, version their rules in one control plane, and meet only on conformed dimensions</span></div>
+
+    <div class="tb"><span>▲ trust boundary</span><hr><span>everything left of stage 06 is untrusted input: validated, bounded and deduped on arrival</span></div>
+    <div class="rtn"><span>◀ return path</span><hr><span>stage 10 writes a policy to the control plane → collectors cache it → stage 06 matches it → it rides the upload ACK back to the device. That is the only channel the backend has downward to players. Service agents get the same policy over <span class="g" data-k="opamp">OpAMP</span>.</span></div>
+    <div class="rtn"><span>┄ dashed nodes</span><hr><span>not stages — nothing transforms there. The query service applies shared metric definitions and guardrails to read traffic; the policy store holds threshold profiles, forensic policies and classification <span class="g" data-k="ruleset">rulesets</span>.</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+<main>
+
+<!-- SCENARIO -->
+<section id="scenario">
+  <div class="sh"><span class="n">00</span><h2>The scenario</h2></div>
+  <p class="sub">A live football match. At <b>12:11 UTC</b> a CDN edge begins failing for a subset of viewers. We follow one of them.</p>
+  <div class="chips">
+    <span class="chip">playback_id <b>8f2c41a9e7b3</b></span>
+    <span class="chip">device <b>Samsung TV 2021</b></span>
+    <span class="chip">app <b>7.2.0</b></span>
+    <span class="chip">CDN <b>edge-b</b></span>
+    <span class="chip">ISP <b>AS7922 Comcast</b></span>
+    <span class="chip">region <b>US-IL</b></span>
+    <span class="chip">minute <b>12:11:00Z</b></span>
+  </div>
+  <div class="card">
+    <div class="lbl"><span>what happened in that minute</span><span class="sz">60s wall clock</span></div>
+    <div class="tlw">
+      <div class="tl">
+        <div style="flex:19; background:var(--good)">19s playing</div>
+        <div style="flex:5; background:var(--bad)">5s buffer</div>
+        <div style="flex:14; background:var(--good)">14s playing</div>
+        <div style="flex:6; background:var(--bad)">6s buffer</div>
+        <div style="flex:14; background:var(--good)">14s playing</div>
+        <div style="flex:2; background:var(--bad)">2s</div>
+      </div>
+      <div class="tlx"><span style="flex:19">:00</span><span style="flex:5"></span><span style="flex:14">:24</span><span style="flex:6"></span><span style="flex:14">:44</span><span style="flex:2"></span></div>
+    </div>
+    <p class="cap"><b><span class="g" data-k="intent">intent_seconds</span> = 60</b> · <b>active_seconds = 47</b> · 3 rebuffers totalling 13,040&nbsp;ms · no ads in this minute. The viewer is having a bad minute — formally an <b>impacted minute</b>, and note what that means: <b>all 60 of its opportunity seconds count as impacted, not just the 13 spent buffering.</b> Minute health is seconds-weighted, not seconds-resolved. Thousands of viewers on the same edge are having the same minute.</p>
+  </div>
+
+  <h3>Who runs what, and what each side is allowed to know</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Zone</th><th>Stages</th><th>Does</th><th>Knows</th><th>Cannot know</th></tr></thead>
+    <tbody>
+      <tr><td><span class="zb dev" style="margin:0">on device</span></td><td class="m">01–04</td><td>State machine, exact millisecond timing, semantic reduction, packing, onset buffer, queue and retry</td><td>Device, OS, app, player, protocol, DRM, <em>requested</em> CDN, connection type</td><td>Its own ISP, ASN, region, the edge that actually served it, and anything at all about other viewers</td></tr>
+      <tr><td><span class="zb net" style="margin:0">in transit</span></td><td class="m">05</td><td>Batched upload, zstd, HTTP/2 on a reused connection</td><td>Nothing — it is a pipe</td><td>—</td></tr>
+      <tr><td><span class="zb srv" style="margin:0">backend</span></td><td class="m">06–10</td><td>Validate, dedupe, derive geo/ISP/edge from the connection, resolve contexts, aggregate, baseline, detect, attribute, target. Two supporting services sit beside the path: a <b>query service</b> (shared metric definitions, series-compatibility refusal, cohort-size floors, sealed vs restated windows, tenant isolation) and a <b>control plane</b> holding threshold profiles and forensic policies</td><td>Everything the client sent, plus every server-derived dimension, plus the whole population</td><td>Nothing it needs. The <em>cube</em> deliberately cannot identify anyone — no identifiers survive stage 08</td></tr>
+      <tr><td><span class="zb svc" style="margin:0">services</span></td><td class="m">S1–S3</td><td>OTel agent beside each origin-shield, packager, license and ad-decision node: classify spans against a pushed ruleset, seal one summary per key per UTC minute, hold a short span buffer, upload OTLP delta metrics</td><td>Its own service, version, route, dependency, region, and the CDN edge that made each request (a header the CDN injects on origin fetches)</td><td>Whether any viewer was actually hurt. A slow manifest behind a full player buffer never reaches a screen — only the client lane can say</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note key"><span class="tg">The asymmetry is deliberate</span><p>The client is a measurement instrument, not a decision-maker. It classifies its own minute against a policy and posts it. It never evaluates a cohort predicate, never learns a population statistic, and is never told its derived dimensions — which is exactly why forensic targeting has to be resolved server-side and ride the ACK (stage 10).</p></div>
+</section>
+
+<!-- STAGE 1 -->
+<section id="s1">
+  <div class="sh"><span class="n">01</span><h2>What the player emits</h2><span class="zb dev">on device</span></div>
+  <p class="sub">Native player events for this one minute. This is the substrate an event-centric system ships and reconstructs server-side.</p>
+  <div class="card">
+    <div class="lbl"><span>raw player event log · playback 8f2c41a9 · 12:11:00–12:11:59</span><span class="sz">22 events · 10,230 B</span></div>
+<div class="evlist">12:11:00.104  <span style="color:#8FA3B2">timeupdate</span>      {pos:1854.2, buf:12.4, br:5800000, dropped:0, ...}
+12:11:03.212  <span style="color:#8FA3B2">timeupdate</span>      {pos:1857.3, buf:9.1,  br:5800000, dropped:0, ...}
+12:11:06.318  <span style="color:#8FA3B2">timeupdate</span>      {pos:1860.4, buf:5.8,  br:5800000, dropped:2, ...}
+12:11:09.421  <span style="color:#8FA3B2">timeupdate</span>      {pos:1863.5, buf:2.2,  br:5800000, dropped:0, ...}
+12:11:12.004  <span style="color:#E2B778">bitratechange</span>   {from:5800000, to:3200000, reason:"abr", ...}
+12:11:15.530  <span style="color:#8FA3B2">timeupdate</span>      {pos:1869.6, buf:1.1,  br:3200000, dropped:1, ...}
+12:11:19.002  <span style="color:#E27C68">waiting</span>         {pos:1873.1, buf:0.0, readyState:2, ...}
+12:11:19.640  <span style="color:#8FA3B2">progress</span>        {buffered:[[1873.1,1873.6]], ...}
+12:11:22.118  <span style="color:#8FA3B2">progress</span>        {buffered:[[1873.1,1875.9]], ...}
+12:11:24.060  <span style="color:#61B892">playing</span>         {pos:1873.1, buf:2.8, br:3200000, ...}
+12:11:27.166  <span style="color:#8FA3B2">timeupdate</span>      {pos:1876.2, buf:3.4, br:3200000, dropped:0,...}
+12:11:30.271  <span style="color:#8FA3B2">timeupdate</span>      {pos:1879.3, buf:2.0, br:3200000, dropped:0,...}
+12:11:33.377  <span style="color:#8FA3B2">timeupdate</span>      {pos:1882.4, buf:0.9, br:3200000, dropped:4,...}
+12:11:36.010  <span style="color:#E2B778">bitratechange</span>   {from:3200000, to:1600000, reason:"abr", ...}
+12:11:38.004  <span style="color:#E27C68">waiting</span>         {pos:1886.9, buf:0.0, readyState:2, ...}
+12:11:40.552  <span style="color:#8FA3B2">progress</span>        {buffered:[[1886.9,1888.1]], ...}
+12:11:42.330  <span style="color:#E2B778">cdnfailover</span>     {from:"edge-b3", to:"edge-b7", ...}
+12:11:44.019  <span style="color:#61B892">playing</span>         {pos:1886.9, buf:3.1, br:1600000, ...}
+12:11:47.124  <span style="color:#8FA3B2">timeupdate</span>      {pos:1890.0, buf:2.7, br:1600000, dropped:0,...}
+12:11:50.230  <span style="color:#8FA3B2">timeupdate</span>      {pos:1893.1, buf:1.4, br:1600000, dropped:0,...}
+12:11:57.898  <span style="color:#E27C68">waiting</span>         {pos:1900.7, buf:0.0, readyState:2, ...}
+12:11:59.941  <span style="color:#61B892">playing</span>         {pos:1900.7, buf:1.9, br:1600000, ...}</div>
+    <p class="cap">Each event carries a full context envelope in production — session id, device, app version, player version, content id, DRM, CDN — repeated on every line. <b>Mean 465 B/event.</b> Five of the 22 events carry information that changes the viewer's experience classification. The other seventeen are position telemetry.</p>
+  </div>
+  <div class="note cost"><span class="tg">The scaling problem</span><p>Event volume is a property of the <em>player</em>, not of the viewing. A player release that raises <code>timeupdate</code> frequency from 3s to 1s triples your telemetry bill and changes nothing about what anyone learns.</p></div>
+</section>
+
+<!-- STAGE 2 -->
+<section id="s2">
+  <div class="sh"><span class="n">02</span><h2>What the SDK holds in memory</h2><span class="zb dev">on device</span></div>
+  <p class="sub">The SDK never stores the event log. It runs a <span class="g" data-k="statemachine">state machine</span> and keeps accumulators. Exact timing happens here, at full resolution, before any reduction.</p>
+  <div class="two-a">
+    <div class="card">
+      <div class="lbl"><span>resident SDK state · per playback</span><span class="sz">~1.4 KB</span></div>
+<pre><span class="c">// live, mutated on every player event, never transmitted</span>
+<span class="k">state</span>            <span class="s">PLAYING</span>           <span class="c">// state machine cursor (fixed at release)</span>
+<span class="k">ruleset_version</span>  7                 <span class="c">// classification rules (pushed as data)</span>
+<span class="k">state_since_ms</span>   1757938319941
+<span class="k">minute_bucket</span>    <span class="s">2026-09-17T12:11:00Z</span>
+
+<span class="c">// accumulators — reset at each minute boundary</span>
+<span class="k">intent_ms</span>        60000
+<span class="k">active_ms</span>        46960
+<span class="k">rebuf_count</span>      3
+<span class="k">rebuf_ms</span>         13040
+<span class="k">freeze_ms</span>        0
+<span class="k">ad_intent_ms</span>     0
+<span class="k">issue_bits</span>       0b00000010     <span class="c">// REBUFFER</span>
+<span class="k">ctx_flags</span>        0b00000001     <span class="c">// CDN_SWITCH</span>
+
+<span class="c">// lifetime, not per minute</span>
+<span class="k"><span class="g" data-k="seq">sequence_no</span></span>      187
+<span class="k">attempt</span>          {id:.., result:STARTED, startup_ms:1840, retries:0}
+<span class="k">local_ctx</span>        3               <span class="c">// index into local dictionary</span>
+<span class="k">clock_offset_ms</span>  -412            <span class="c">// from last upload ACK</span>
+
+<span class="c">// bounded circular buffer — forensics only, never sent</span>
+<span class="c">// unless a targeting directive arrives (stage 10)</span>
+<span class="k">onset_buffer</span>     [ 5 min of raw events, ~48 KB, FIFO ]</pre>
+    </div>
+    <div>
+      <div class="card">
+        <div class="lbl"><span>local context dictionary</span><span class="sz">4 entries</span></div>
+<pre><span class="n">0</span> {dev:<span class="s">"SamsungTV21"</span>, os:<span class="s">"tizen6.0"</span>, app:<span class="s">"7.2.0"</span>,
+   player:<span class="s">"4.1.2"</span>, proto:<span class="s">"hls"</span>, drm:<span class="s">"widevine"</span>,
+   cdn_req:<span class="s">"edge-a"</span>, conn:<span class="s">"ethernet"</span>}
+<span class="n">1</span> {... cdn_req:<span class="s">"edge-b"</span> ...}
+<span class="n">2</span> {... app:<span class="s">"7.2.0"</span>, proto:<span class="s">"hls"</span>, conn:<span class="s">"wifi"</span> ...}
+<span class="hl"><span class="n">3</span> {... cdn_req:<span class="s">"edge-b"</span>, conn:<span class="s">"ethernet"</span> ...}  ← active</span></pre>
+        <p class="cap">Assigned by the client, sent once, referenced by a 1-byte index thereafter.</p>
+      </div>
+      <div class="note key"><span class="tg">Why client-side</span><p>The client knows its own device, OS, app and protocol. It does <b>not</b> know its ISP, ASN, region, or which edge actually served it — those are derived from the connection at ingest and never travel downward.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 3 -->
+<section id="s3">
+  <div class="sh"><span class="n">03</span><h2>The minute boundary: 22 events become 1 record</h2><span class="zb dev">on device</span></div>
+  <p class="sub">At <code>12:12:00Z</code> the accumulators are sealed into one semantic record. Colours link each output field to the events that produced it.</p>
+  <div class="two">
+    <div class="card">
+      <div class="lbl"><span>inputs consumed</span><span class="sz">22 events · 10,230 B</span></div>
+      <div style="font-size:.8rem; line-height:2">
+        <div><span class="dot" style="background:var(--good)"></span>17× <span class="mono">timeupdate / progress / playing</span> → playback continuity</div>
+        <div><span class="dot" style="background:var(--bad)"></span>3× <span class="mono">waiting</span> + 3× <span class="mono">playing</span> → rebuffer count &amp; duration</div>
+        <div><span class="dot" style="background:var(--warn)"></span>2× <span class="mono">bitratechange</span> → quality state evaluation</div>
+        <div><span class="dot" style="background:var(--violet)"></span>1× <span class="mono">cdnfailover</span> → context change, <em>not</em> an issue</div>
+      </div>
+      <p class="cap"><b>Discarded permanently:</b> playback positions, buffer levels, dropped-frame counts, per-event ABR reasons, and the exact interleaving. See the ledger in stage 11.</p>
+    </div>
+    <div class="card">
+      <div class="lbl"><span>ExperienceMinute · JSON form</span><span class="sz">342 B</span></div>
+<div class="flist"><span class="fn">minute_ts</span>              <span class="fv">"2026-09-17T12:11:00Z"</span>
+<span class="fn">seq</span>                    <span class="fv">187</span>
+<span class="fn">ctx</span>                    <span class="fv">3</span>
+<span class="fn">content_intent_s</span>       <span class="fv">60</span>   <span class="fs"><span class="dot" style="background:var(--good)"></span>state machine</span>
+<span class="fn">content_active_s</span>       <span class="fv">47</span>   <span class="fs"><span class="dot" style="background:var(--good)"></span>state machine</span>
+<span class="fn">content_issues</span>         <span class="fv">0x02</span> <span class="fs"><span class="dot" style="background:var(--bad)"></span>REBUFFER</span>
+<span class="fn">ad_intent_s</span>            <span class="fv">0</span>
+<span class="fn">ad_active_s</span>            <span class="fv">0</span>
+<span class="fn">ad_issues</span>              <span class="fv">0x00</span>
+<span class="fn">rebuffer_count</span>         <span class="fv">3</span>    <span class="fs"><span class="dot" style="background:var(--bad)"></span>3× waiting</span>
+<span class="fn">rebuffer_ms</span>            <span class="fv">13040</span> <span class="fs"><span class="dot" style="background:var(--bad)"></span>measured</span>
+<span class="fn">freeze_ms</span>              <span class="fv">0</span>
+<span class="fn">startup_ms</span>             <span class="fv">0</span>    <span class="fs">(attempt-level)</span>
+<span class="fn">ctx_change_flags</span>       <span class="fv">0x01</span> <span class="fs"><span class="dot" style="background:var(--violet)"></span>CDN_SWITCH</span>
+<span class="fn">taxonomy_version</span>       <span class="fv">3</span>
+<span class="fn">threshold_profile_id</span>   <span class="fv">11</span>
+<span class="fn">eligibility_policy</span>     <span class="fv">2</span></div>
+    </div>
+  </div>
+  <div class="note win"><span class="tg">Reduction so far</span><p><b>10,230 B → 342 B · 30×</b>, with no loss of the measurement substrate the supported KPIs need. Diagnostic precision is deliberately discarded, and more goes in the next stage: <code>rebuffer_ms = 13040</code> is exact here because it was measured on-device at full resolution, but packing will reduce it to a bucket.</p></div>
+  <div class="note care"><span class="tg">One flag you will not see here</span><p>This viewer recovered from all three stalls, so the minute is <code>REBUFFER</code>. Had any single stall run past 30 seconds the minute would carry <span class="g" data-k="stalltimeout">STALL_TIMEOUT</span> instead, <code>REBUFFER</code> would be cleared, and intent seconds would stop accruing — so a viewer who walked away from a spinning player cannot quietly dominate the impact ranking in stage 10.</p></div>
+  <div class="note care"><span class="tg">Note the two <span class="g" data-k="bitmap">bitmaps</span></span><p><code>content_issues</code> and <code>ad_issues</code> are separate. A single bitmap plus a seconds split would let an ad-server failure register as content degradation. <code>CDN_SWITCH</code> sits in <code>ctx_change_flags</code>, outside the issue bitmap, so "any issue bit set" never misfires on a routine failover.</p></div>
+</section>
+
+<!-- STAGE 4 -->
+<section id="s4">
+  <div class="sh"><span class="n">04</span><h2>Packing: 342 B to 24 B</h2><span class="zb dev">on device</span></div>
+  <p class="sub">Field names, quotes, and repeated identifiers are the bulk of the JSON, and <span class="g" data-k="varint">varint</span> encoding shrinks what is left. The wire format carries none of them.</p>
+  <div class="card">
+    <div class="lbl"><span>packed ExperienceMinute · byte layout</span><span class="sz">24 B</span></div>
+    <div class="bytes" id="bytemap"></div>
+    <p class="ghint">Tap any byte to see what it holds. Dotted terms elsewhere on the page work the same way.</p>
+    <div class="bl">
+      <span><i style="background:var(--blue)"></i>time &amp; sequence — delta from batch base (3 B)</span>
+      <span><i style="background:var(--accent)"></i>context ref (1 B)</span>
+      <span><i style="background:var(--good)"></i>content seconds &amp; issues (3 B)</span>
+      <span><i style="background:var(--warn)"></i>ad seconds &amp; issues (3 B)</span>
+      <span><i style="background:var(--bad)"></i>issue counters, bucketed (8 B)</span>
+      <span><i style="background:var(--violet)"></i>context-change flags (1 B)</span>
+      <span><i style="background:var(--blue)"></i>bitrate bucket + peak-rendition seconds (2 B)</span>
+      <span><i style="background:var(--ink-3)"></i>reserved / alignment (3 B)</span>
+    </div>
+    <p class="cap"><b>This is a proposed encoding, not a measured one.</b> The field widths, varint sizes and bucket boundaries below are internally consistent and need implementing and measuring before any of them is quoted. <b>Absent by design:</b> <code>playback_id</code>, <code>session_id</code>, and all three policy versions. They are constant across the batch, so they live once in the batch header rather than 5× in the records.</p>
+  </div>
+  <div class="two">
+    <div class="card">
+      <div class="lbl"><span>where the 318 bytes went</span></div>
+      <div class="ladder">
+        <div class="lrow"><span>JSON keys &amp; syntax</span><span><span class="lb" style="width:56%; background:var(--bad)">191 B</span></span><span class="v">−191</span></div>
+        <div class="lrow"><span>IDs hoisted to header</span><span><span class="lb" style="width:26%; background:var(--warn)">88 B</span></span><span class="v">−88</span></div>
+        <div class="lrow"><span>ts/seq → deltas</span><span><span class="lb" style="width:7%; background:var(--blue)">24</span></span><span class="v">−24</span></div>
+        <div class="lrow"><span>ms → bucketed varints</span><span><span class="lb" style="width:4%; background:var(--violet)">15</span></span><span class="v">−15</span></div>
+        <div class="lrow"><span>remaining payload</span><span><span class="lb" style="width:7%; background:var(--good)">24 B</span></span><span class="v">24</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="note cost"><span class="tg">The one real loss here</span><p><code>rebuffer_ms</code> goes from exact (13040) to a <b><span class="g" data-k="bucket">log-scale bucket</span></b> (bucket 11 = 12.8–16.4s). Bucketing is what allows any later re-thresholding at all — a bare boolean could never be recovered. But bucket resolution is the permanent floor on retrospective analysis.</p></div>
+      <div class="note key"><span class="tg">Why 24 B and not 8 B</span><p>The record is <em>still</em> 24 B after quality measurement was added, because <b>bitrate and peak-rendition seconds went into reserved bytes</b>. That is what reserve is for. Three remain — adding a field later without a schema migration across millions of unupgradeable CTV devices is worth more than three bytes.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 5 -->
+<section id="s5">
+  <div class="sh"><span class="n">05</span><h2>What actually crosses the wire</h2><span class="zb net">device → backend</span></div>
+  <p class="sub">One upload per minute, <span class="g" data-k="stagger">staggered</span> across the minute so a million devices do not all transmit at :00, over a connection that stays open. The cadence is a dial, and where it is set decides both the bill and the detection floor.</p>
+  <div class="two-a">
+    <div class="card">
+      <div class="lbl"><span>batch envelope · POST /v1/ingest</span><span class="sz">~48 B → ~78 B on the wire</span></div>
+<pre><span class="c">── first upload of this playback · 56 B header ─────</span>
+<span class="k">schema_version</span>    2
+<span class="k">playback_id</span>       8f2c41a9e7b3          <span class="c">8 B</span>
+<span class="k">session_id</span>        4d1e77b2              <span class="c">8 B</span>
+<span class="k">device_id</span>         a903f1c8              <span class="c">8 B</span>
+<span class="k">base_minute_ts</span>    2026-09-17T12:08:00Z  <span class="c">4 B</span>
+<span class="k">base_sequence</span>     184                   <span class="c">2 B</span>
+<span class="k">taxonomy_v</span> / <span class="k">threshold_profile</span> / <span class="k">eligibility_v</span>
+<span class="k">ctx_defs</span>          [ctx 1]   <span class="c">// only when a context is new</span>
+                    <span class="c">→ ACK returns an upload_token</span>
+
+<span class="c">── every upload after that · 24 B header ───────────</span>
+<span class="k">upload_token</span>      7f22c1a9   <span class="c">8 B · replaces all three ids</span>
+<span class="k">minute_delta</span>      +3         <span class="c">2 B · from base_minute_ts</span>
+<span class="k">seq_delta</span>         +3         <span class="c">2 B</span>
+<span class="k">policy_ref</span>        unchanged  <span class="c">2 B</span>
+
+<span class="c">── payload · one minute record ─────────────────────</span>
+<span class="hl"><span class="k">minutes</span>[0]  12:11  seq187  ctx3  60/47  REBUFFER   <span class="c">24 B</span></span>
+
+<span class="c">── transport ───────────────────────────────────────</span>
+Content-Encoding: <span class="g" data-k="zstd">zstd</span>   48 B → 44 B
+                          <span class="c">// little to squeeze at this size</span>
+<span class="g" data-k="http2">HTTP/2 multiplexed</span>        <span class="g" data-k="framing">framing</span> ~34 B amortised
+<span class="k">upload at</span>  12:12:00 + (hash(playback_id) mod 60)s  <span class="c">// staggered</span>
+                          <span class="c">≈ 78 B per minute on the wire</span></pre>
+    </div>
+    <div>
+      <div class="card">
+        <div class="lbl"><span>the ACK is not empty</span><span class="sz">response</span></div>
+<pre><span class="k">200 OK</span>
+{
+  <span class="f">"accepted"</span>: 5,
+  <span class="f">"server_ts"</span>: <span class="s">"2026-09-17T12:13:04.118Z"</span>,
+  <span class="f">"clock_offset_ms"</span>: -412,
+  <span class="f">"config"</span>: {<span class="f">"threshold_profile"</span>: 11, <span class="f">"ruleset_version"</span>: 7},
+  <span class="f">"targeting"</span>: <span class="n">null</span>          <span class="c">// see stage 10</span>
+}</pre>
+        <p class="cap">Clock correction, config pointer, and forensic targeting all ride the response. No polling loop, no second control channel.</p>
+      </div>
+      <div class="note care"><span class="tg">Cadence is the dial</span><p><b>Every 5 minutes:</b> ~23 B/min. The 56 B header amortises over five records and <span class="g" data-k="zstd">zstd</span> has enough material to work with. But it puts a <b>5-minute floor under detection</b>, which would eat the entire latency budget before the detector ran once.</p><p style="margin-top:.5rem"><b>Every minute</b> — what this deployment does: <b>~78 B/min</b>, roughly 3.4× the bytes, each device transmitting in its own <span class="g" data-k="stagger">staggered slot</span>. A single 24 B record barely compresses, and per-request framing no longer has four siblings to share with. You are buying detection latency with bytes. Targeted playbacks drop to 10s and pay more again.</p></div>
+    </div>
+  </div>
+
+  <h3>The honest compression ladder</h3>
+  <div class="card">
+    <div class="ladder">
+      <div class="lrow"><span>Raw events, uncompressed</span><span><span class="lb" style="width:100%; background:var(--bad)">10,230 B</span></span><span class="v">1×</span></div>
+      <div class="lrow"><span>Raw events, <span class="g" data-k="zstd">zstd</span> batched</span><span><span class="lb" style="width:15.6%; background:var(--warn)">1,600 B</span></span><span class="v">6.4×</span></div>
+      <div class="lrow"><span>Semantic JSON</span><span><span class="lb" style="width:3.3%; min-width:3px; background:var(--blue)">342</span></span><span class="v">30×</span></div>
+      <div class="lrow"><span>Packed record</span><span><span class="lb" style="width:.24%; min-width:3px; background:var(--violet)"></span></span><span class="v">24 B · 426×</span></div>
+      <div class="lrow"><span>On the wire, all-in</span><span><span class="lb" style="width:.77%; min-width:3px; background:var(--good)"></span></span><span class="v">78 B · 131×</span></div>
+    </div>
+    <p class="cap"><b>Do not quote 131×.</b> And note the last two rows: the wire figure is <em>larger</em> than the packed record, because header and framing dominate once you send every minute. Production event pipelines already batch and compress, so the fair wire-to-wire comparison is <b>1,600 B → 78 B ≈ 20× for this worked example</b> — one synthetic minute, excluding attempts, intervals, context definitions, retries and control traffic. It is not a system-level compression figure, and the <b>80 B/minute planning number stays primary</b>. The claim worth defending is not a multiple at all: it is that volume now scales with <em>viewing minutes</em> instead of with player chattiness.</p>
+  </div>
+  <div class="note key"><span class="tg">Where the 80 B/minute planning figure comes from</span><p>It is not padding. <b>~78 B/min is what a 1-minute cadence actually costs</b>, and the architecture spec rounds it to 80. At 1M concurrent that is <b>1.3 MB/s</b>. The 23 B/min figure people remember belongs to the 5-minute cadence nobody is running.</p></div>
+</section>
+
+<!-- STAGE 6 -->
+<section id="s6">
+  <div class="sh"><span class="n">06</span><h2>Ingest: the row gets bigger</h2><span class="zb srv">backend · ingest</span></div>
+  <p class="sub">Compression ends at the collector. Server-side, the record is enriched with everything the client was never told.</p>
+  <div class="card">
+    <div class="lbl"><span>collector pipeline · stateless</span></div>
+<pre><span class="k">1 validate</span>     schema v2 · sanity bounds (intent_s ≤ 60, active ≤ intent)
+<span class="k">2 <span class="g" data-k="dedupe">dedupe</span></span>       key = (playback_id, sequence_no) · 10-min TTL store
+               <span class="c">→ duplicate delivery collapsed within the TTL window.</span>
+               <span class="c">  effectively-once at the accepted-record layer, not</span>
+               <span class="c">  exactly-once transport. client may retry freely.</span>
+<span class="k">3 derive</span>       from connection IP, never from the payload:
+               <span class="f">isp</span>=<span class="s">"Comcast"</span>  <span class="f">asn</span>=7922  <span class="f">country</span>=<span class="s">"US"</span>  <span class="f">region</span>=<span class="s">"US-IL"</span>
+               <span class="f">cdn_served</span>=<span class="s">"edge-b7"</span>   <span class="c">// resolved, ≠ cdn_requested</span>
+<span class="k">4 resolve</span>      (session_scope, local_ctx 3) → <span class="f">context_key</span> = 40871
+<span class="k">5 stamp</span>        server_receipt_ts · clock_offset_ms = -412
+               <span class="f">minute_ts</span> normalised to UTC bucket
+<span class="k">6 emit</span>         → partitioned log, key = playback_id
+<span class="k">7 match</span>        active ForensicPolicy set, read from the control-plane
+               cache (refreshed every 30s, stale-tolerant)
+               evaluated against the dimensions derived in step 3 —
+               <span class="c">never against anything the client sent</span>
+               → targeting directive attached to the response ACK</pre>
+  </div>
+  <div class="note care"><span class="tg">Requested ≠ served</span><p>The client asked for <code>edge-b</code>. It was served by <code>edge-b7</code> after the failover at 12:11:42. Only the server knows the second fact, and the second fact is the one the incident turns on.</p></div>
+</section>
+
+<!-- STAGE 7 -->
+<section id="s7">
+  <div class="sh"><span class="n">07</span><h2><span class="g" data-k="olap">OLAP</span> storage: the raw minute tier</h2><span class="zb srv">backend · storage</span></div>
+  <p class="sub">Short retention, per-playback granularity, heavily codec-compressed. No dashboard or detector reads it on the hot path; drill-down, exact seconds-weighted confirmation, and interval joins do.</p>
+  <div class="card">
+    <div class="lbl"><span>experience_minute · MergeTree</span><span class="sz">TTL 21 days</span></div>
+<pre><span class="k">CREATE TABLE</span> experience_minute
+(
+  minute_ts           <span class="n">DateTime</span>   <span class="k">CODEC</span>(DoubleDelta, ZSTD(1)),
+  context_key         <span class="n">UInt32</span>     <span class="k">CODEC</span>(T64, ZSTD(1)),
+  playback_id         <span class="n">UInt64</span>     <span class="k">CODEC</span>(ZSTD(1)),
+  session_id          <span class="n">UInt64</span>     <span class="k">CODEC</span>(ZSTD(1)),
+  sequence_no         <span class="n">UInt16</span>     <span class="k">CODEC</span>(Delta, ZSTD(1)),
+  content_intent_s    <span class="n">UInt8</span>      <span class="k">CODEC</span>(T64, ZSTD(1)),
+  content_active_s    <span class="n">UInt8</span>      <span class="k">CODEC</span>(T64, ZSTD(1)),
+  content_issues      <span class="n">UInt8</span>      <span class="k">CODEC</span>(ZSTD(1)),
+  ad_intent_s         <span class="n">UInt8</span>      <span class="k">CODEC</span>(T64, ZSTD(1)),
+  ad_active_s         <span class="n">UInt8</span>      <span class="k">CODEC</span>(T64, ZSTD(1)),
+  ad_issues           <span class="n">UInt8</span>      <span class="k">CODEC</span>(ZSTD(1)),
+  rebuffer_count      <span class="n">UInt8</span>      <span class="k">CODEC</span>(T64, ZSTD(1)),
+  rebuffer_ms_bucket  <span class="n">UInt8</span>      <span class="k">CODEC</span>(T64, ZSTD(1)),
+  freeze_ms_bucket    <span class="n">UInt8</span>      <span class="k">CODEC</span>(T64, ZSTD(1)),
+  ctx_change_flags    <span class="n">UInt8</span>      <span class="k">CODEC</span>(ZSTD(1)),
+  policy_key          <span class="n">UInt16</span>     <span class="k">CODEC</span>(ZSTD(1)),
+  clock_offset_ms     <span class="n">Int32</span>      <span class="k">CODEC</span>(T64, ZSTD(1))
+)
+<span class="k">ENGINE</span> = MergeTree
+<span class="k">PARTITION BY</span> toYYYYMMDD(minute_ts)
+<span class="k">ORDER BY</span>     (minute_ts, context_key, playback_id)   <span class="c">← the only index there is</span>
+<span class="k">TTL</span>          minute_ts + <span class="k">INTERVAL</span> 21 <span class="k">DAY</span>;</pre>
+    <p class="cap"><b>There are no per-column indexes.</b> The <span class="g" data-k="sortkey">sort key</span> is the index, it is sparse — one entry per 8,192-row granule — and it only accelerates filters on a prefix of itself. Sorting by <code>context_key</code> before <code>playback_id</code> puts thousands of identical values in a run, which compresses them to almost nothing. It does <em>not</em> turn a broad cohort query into a single range read: <code>context_key</code> is a surrogate, so "all of edge-b" is thousands of scattered keys.</p>
+    <div class="note key" style="margin:.8rem 0 0"><span class="tg">So how is a drill-down fast?</span><p>Filter on <code>cdn</code> and the engine resolves it against <code>context_dim</code> first — 180k rows, in memory, sub-millisecond — then pushes the matching keys into the cube scan. <b>It is quick because the thing being scanned is small, not because anything is indexed.</b> A detector window is ~210k cube rows. The cube's real job is to make indexing unnecessary: 1.44 billion per-playback rows a day would force an indexing strategy, and aggregating at write time buys the freedom not to have one.</p></div>
+  </div>
+
+  <h3>Where the bytes actually go</h3>
+  <p style="font-size:.88rem; color:var(--ink-2)">Each column gets its own <span class="g" data-k="codec">codec</span>, and the table is a <span class="g" data-k="mergetree">MergeTree</span> with a 21-day <span class="g" data-k="ttl">TTL</span>.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Column</th><th class="r">In memory</th><th class="r">On disk</th><th class="barcell">Share of stored bytes</th><th class="r">Ratio</th></tr></thead>
+    <tbody>
+      <tr class="hlr"><td class="m">playback_id</td><td class="r">8 B</td><td class="r">3.10 B</td><td><span class="bar b2" style="width:100%"></span></td><td class="r">2.6×</td></tr>
+      <tr class="hlr"><td class="m">session_id</td><td class="r">8 B</td><td class="r">2.05 B</td><td><span class="bar b2" style="width:66%"></span></td><td class="r">3.9×</td></tr>
+      <tr><td class="m">context_key</td><td class="r">4 B</td><td class="r">0.62 B</td><td><span class="bar" style="width:20%"></span></td><td class="r">6.5×</td></tr>
+      <tr><td class="m">content_active_s</td><td class="r">1 B</td><td class="r">0.48 B</td><td><span class="bar" style="width:15%"></span></td><td class="r">2.1×</td></tr>
+      <tr><td class="m">rebuffer_ms_bucket</td><td class="r">1 B</td><td class="r">0.31 B</td><td><span class="bar" style="width:10%"></span></td><td class="r">3.2×</td></tr>
+      <tr><td class="m">clock_offset_ms</td><td class="r">4 B</td><td class="r">0.29 B</td><td><span class="bar" style="width:9%"></span></td><td class="r">13.8×</td></tr>
+      <tr><td class="m">sequence_no</td><td class="r">2 B</td><td class="r">0.18 B</td><td><span class="bar" style="width:6%"></span></td><td class="r">11.1×</td></tr>
+      <tr><td class="m">content_issues</td><td class="r">1 B</td><td class="r">0.11 B</td><td><span class="bar" style="width:4%"></span></td><td class="r">9.1×</td></tr>
+      <tr><td class="m">rebuffer_count</td><td class="r">1 B</td><td class="r">0.09 B</td><td><span class="bar" style="width:3%"></span></td><td class="r">11.1×</td></tr>
+      <tr><td class="m">minute_ts</td><td class="r">4 B</td><td class="r">0.04 B</td><td><span class="bar" style="width:1%"></span></td><td class="r">100×</td></tr>
+      <tr><td class="m">all remaining columns</td><td class="r">12 B</td><td class="r">0.13 B</td><td><span class="bar" style="width:4%"></span></td><td class="r">92×</td></tr>
+      <tr class="tot"><td>row total</td><td class="r">46 B</td><td class="r">7.40 B</td><td></td><td class="r">6.2×</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note key"><span class="tg">The identifiers are 70% of the storage</span><p><code>playback_id</code> and <code>session_id</code> are high-entropy and essentially incompressible. They dominate this table's cost. That single fact drives two decisions at once: <b>short retention here</b>, and <b>no identifiers in the cube or the rollups</b>. The privacy posture and the cost model happen to want exactly the same thing.</p></div>
+  <div class="chips">
+    <span class="chip">1M concurrent → <b>16,700 rows/s</b></span>
+    <span class="chip">1.44 B rows/day</span>
+    <span class="chip">66 GB/day in memory</span>
+    <span class="chip"><b>10.7 GB/day on disk</b></span>
+    <span class="chip">21-day tier ≈ <b>224 GB</b></span>
+  </div>
+</section>
+
+<!-- STAGE 7B -->
+<section id="s7b">
+  <div class="sh"><span class="n">7b</span><h2>The interval tier: what was watched</h2><span class="zb srv">backend · storage</span></div>
+  <p class="sub">Minutes know quality but not content. Intervals know content but not minutes. Watch time, completion and per-title reporting all live here — on 90-day retention, because these are business numbers, not incident numbers.</p>
+  <div class="card">
+    <div class="lbl"><span>playback_interval · MergeTree</span><span class="sz">~5 rows per viewer-hour</span></div>
+<pre><span class="k">CREATE TABLE</span> playback_interval
+(
+  start_ts          <span class="n">DateTime</span>  <span class="k">CODEC</span>(DoubleDelta, ZSTD(1)),
+  playback_id       <span class="n">UInt64</span>    <span class="k">CODEC</span>(ZSTD(1)),
+  context_key       <span class="n">UInt32</span>    <span class="k">CODEC</span>(T64, ZSTD(1)),
+  asset_id          <span class="n">UInt64</span>    <span class="k">CODEC</span>(ZSTD(1)),
+  program_id        <span class="n">UInt64</span>    <span class="k">CODEC</span>(ZSTD(1)),   <span class="c">-- live only</span>
+  asset_type        <span class="n">Enum8</span>(<span class="s">'content'</span>=1,<span class="s">'live'</span>=2,<span class="s">'ad'</span>=3,<span class="s">'promo'</span>=4,<span class="s">'slate'</span>=5),
+  duration_ms       <span class="n">UInt32</span>    <span class="k">CODEC</span>(T64, ZSTD(1)),  <span class="c">-- wall time</span>
+  <span class="hl">  active_ms         <span class="n">UInt32</span>    <span class="k">CODEC</span>(T64, ZSTD(1)),  <span class="c">-- rendered time ← watch time</span></span>
+  max_position_pct  <span class="n">UInt8</span>     <span class="k">CODEC</span>(T64, ZSTD(1)),  <span class="c">-- furthest point reached</span>
+  watched_pct       <span class="n">UInt8</span>     <span class="k">CODEC</span>(T64, ZSTD(1)),  <span class="c">-- active_ms ÷ asset length</span>
+  bitrate_bucket    <span class="n">UInt8</span>     <span class="k">CODEC</span>(T64, ZSTD(1)),
+  issue_summary     <span class="n">UInt8</span>     <span class="k">CODEC</span>(ZSTD(1)),
+  end_reason        <span class="n">Enum8</span>(<span class="s">'completed'</span>=1,<span class="s">'user_exit'</span>=2,<span class="s">'error'</span>=3,
+                          <span class="s">'switched'</span>=4,<span class="s">'session_end'</span>=5,<span class="s">'stall_timeout'</span>=6)
+)
+<span class="k">ENGINE</span> = MergeTree
+<span class="k">PARTITION BY</span> toYYYYMMDD(start_ts)
+<span class="k">ORDER BY</span>     (start_ts, asset_id, playback_id)  <span class="c">← asset second: content queries filter on it</span>
+<span class="k">TTL</span>          start_ts + <span class="k">INTERVAL</span> 90 <span class="k">DAY</span>;</pre>
+    <p class="cap">Two completion numbers on purpose. <code>max_position_pct</code> reads 100% for someone who seeks to the credits; <code>watched_pct</code> does not. Product teams want the gap between them. Asset length lives in an asset dimension table, never on every row.</p>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <div class="lbl"><span>content_daily · the reporting rollup</span></div>
+<pre><span class="k">CREATE MATERIALIZED VIEW</span> content_daily_mv <span class="k">TO</span> content_daily <span class="k">AS</span>
+<span class="k">SELECT</span>
+  toDate(start_ts) <span class="k">AS</span> day, asset_id, asset_type,
+  device_class, country, cdn,          <span class="c">-- reduced dims</span>
+  <span class="k">sum</span>(active_ms)                      <span class="k">AS</span> watch_ms,
+  <span class="k">sum</span>(duration_ms)                    <span class="k">AS</span> elapsed_ms,
+  <span class="k">avg</span>(watched_pct)                    <span class="k">AS</span> avg_watched_pct,
+  <span class="k">countIf</span>(end_reason = <span class="s">'completed'</span>)  <span class="k">AS</span> completions,
+  <span class="k">count</span>()                             <span class="k">AS</span> intervals,
+  <span class="k">uniqCombinedState</span>(playback_id)     <span class="k">AS</span> playbacks
+<span class="k">FROM</span> playback_interval <span class="k">JOIN</span> context_dim <span class="k">USING</span> (context_key)
+<span class="k">GROUP BY</span> day, asset_id, asset_type, device_class, country, cdn;</pre>
+    </div>
+    <div class="card">
+      <div class="lbl"><span>top titles by <span class="g" data-k="watchtime">watch hours</span></span></div>
+<pre><span class="k">SELECT</span> asset_id,
+       <span class="k">sum</span>(watch_ms)/3.6e6                 <span class="k">AS</span> watch_hours,
+       <span class="k">uniqCombinedMerge</span>(playbacks)       <span class="k">AS</span> unique_plays,
+       <span class="k">sum</span>(completions)/<span class="k">sum</span>(intervals)    <span class="k">AS</span> completion_rate,
+       <span class="k">avg</span>(avg_watched_pct)               <span class="k">AS</span> avg_pct_watched
+<span class="k">FROM</span> content_daily
+<span class="k">WHERE</span> day &gt;= today() - 30 <span class="k">AND</span> asset_type = <span class="s">'content'</span>
+<span class="k">GROUP BY</span> asset_id
+<span class="k">ORDER BY</span> watch_hours <span class="k">DESC</span> <span class="k">LIMIT</span> 50;</pre>
+      <p class="cap">Ad exposure comes out of the same table via <code>asset_type</code>, with no second pipeline.</p>
+    </div>
+  </div>
+
+  <div class="note cost"><span class="tg">Two watch-time numbers that will never match</span><p>Interval watch time does not equal summed minute <code>active_seconds</code>. Intervals measure playback; minutes apply eligibility rules and exclude paused time. They measure different things deliberately. Publish one definition of each and say so — otherwise it arrives as a bug report in month two.</p></div>
+  <div class="note key"><span class="tg">No client session summaries</span><p>Audience and engagement derive from this tier and from attempts, with unique viewers from a <span class="g" data-k="sketch">sketch</span>. A client-emitted session summary is lost exactly when sessions end badly — app killed, TV unplugged — so audience figures built on it would be biased low in precisely the cohorts having problems. If a terminal session record is sent, its job is completeness checking, never metric production.</p></div>
+</section>
+
+<!-- STAGE 8 -->
+<section id="s8">
+  <div class="sh"><span class="n">08</span><h2>The cube: where the read path actually lives</h2><span class="zb srv">backend · storage</span></div>
+  <p class="sub">A <span class="g" data-k="mv">materialized view</span> collapses per-playback rows into per-context aggregates at write time. 16,700 rows/s becomes 700 — a 24× row reduction and a 15× byte reduction, with retention going from 21 days to years.</p>
+  <div class="card">
+    <div class="lbl"><span>minute_cube · <span class="g" data-k="aggmt">AggregatingMergeTree</span>, fed by MV</span></div>
+<pre><span class="k">CREATE MATERIALIZED VIEW</span> minute_cube_mv <span class="k">TO</span> minute_cube <span class="k">AS</span>
+<span class="k">SELECT</span>
+  minute_ts,
+  context_key,
+  policy_key,
+  <span class="k">sum</span>(content_intent_s)                                <span class="k">AS</span> opportunity_s,
+  <span class="k">sumIf</span>(content_intent_s, content_issues  = 0)         <span class="k">AS</span> issue_free_opportunity_s,
+  <span class="k">sumIf</span>(content_intent_s, content_issues != 0)         <span class="k">AS</span> impacted_opportunity_s,
+  <span class="k">sumIf</span>(content_intent_s, bitTest(content_issues, 1))  <span class="k">AS</span> rebuffer_impacted_s,
+  <span class="k">sumIf</span>(content_intent_s, bitTest(content_issues, 0))  <span class="k">AS</span> startup_impacted_s,
+  <span class="k">sumIf</span>(content_intent_s, bitTest(content_issues, 3))  <span class="k">AS</span> error_impacted_s,
+  <span class="k">sum</span>(ad_intent_s)                                     <span class="k">AS</span> ad_opportunity_s,
+  <span class="k">sumIf</span>(ad_intent_s, ad_issues != 0)                   <span class="k">AS</span> ad_impacted_opportunity_s,
+  <span class="k">sum</span>(rebuffer_count)                                    <span class="k">AS</span> rebuffers,
+  <span class="k">count</span>()                                                <span class="k">AS</span> minutes,
+  <span class="k">uniqCombinedState</span>(playback_id)                         <span class="k">AS</span> playbacks   <span class="c">// <span class="g" data-k="sketch">sketch</span></span>
+<span class="k">FROM</span> experience_minute
+<span class="k">GROUP BY</span> minute_ts, context_key, policy_key;
+
+<span class="c">-- identifiers do not survive. uniqCombinedState is a sketch,</span>
+<span class="c">-- not a list. the cube cannot identify anyone.</span></pre>
+  </div>
+  <div class="card">
+    <div class="lbl"><span>minute_cube · rows at 12:11:00Z</span><span class="sz">4 of 42,000</span></div>
+    <div class="tw"><table>
+      <thead><tr><th class="m">context_key</th><th class="m">(resolved)</th><th class="r">opportunity_s</th><th class="r">issue_free_<br>opportunity_s</th><th class="r">impacted_<br>opportunity_s</th><th class="r">rebuffer_<br>impacted_s</th><th class="r">playbacks</th></tr></thead>
+      <tbody>
+        <tr><td class="m">40855</td><td class="m">edge-a · 7.2.0 · TizenTV</td><td class="r">1,043,820</td><td class="r">1,002,067</td><td class="r">41,753</td><td class="r">38,420</td><td class="r">17,397</td></tr>
+        <tr class="hlr"><td class="m">40871</td><td class="m">edge-b · 7.2.0 · TizenTV</td><td class="r">612,480</td><td class="r">475,284</td><td class="r">137,196</td><td class="r">131,908</td><td class="r">10,208</td></tr>
+        <tr><td class="m">40903</td><td class="m">edge-a · 6.8.1 · iOS</td><td class="r">2,214,060</td><td class="r">2,151,269</td><td class="r">62,791</td><td class="r">55,102</td><td class="r">36,901</td></tr>
+        <tr><td class="m">41022</td><td class="m">edge-c · 7.2.0 · AndroidTV</td><td class="r">488,220</td><td class="r">472,331</td><td class="r">15,889</td><td class="r">14,004</td><td class="r">8,137</td></tr>
+      </tbody>
+    </table></div>
+    <p class="cap">Our viewer's minute is now 60 of the 612,480 intent seconds in row <b>40871</b>. The individual is gone; the population is visible.</p>
+    <div class="note care" style="margin:.8rem 0 0"><span class="tg">One quantity, two names</span><p><b>Intent seconds at record level are <span class="g" data-k="opportunity">opportunity seconds</span> at KPI level.</b> Same measurement: the SDK records what the viewer was <em>trying</em> to watch; the KPI layer calls it the opportunity that was either honoured or impacted. The cube column names use the KPI vocabulary so nothing has to be translated between this page and the specification.</p><p style="margin-top:.5rem"><code>issue_free_opportunity_s</code> and <code>impacted_opportunity_s</code> operate on <b><span class="g" data-k="eligible">eligible</span></b> seconds under the recorded <code>policy_key</code>. The bits in <code>content_issues</code> were already set on-device according to that policy's eligibility floor, intent-time rule and thresholds. "Issue bit set = bad" is the simpler and wrong reading; the cube inherits the semantics, it does not define them.</p><p style="margin-top:.5rem">Which is why eligibility and KPI definitions live in <b>one shared metric layer</b>, linked by the detector and wrapped by the query service. Implemented twice, they drift — and the failure looks like an alert firing at 22.4% while the on-call dashboard shows 4%.</p></div>
+  </div>
+  <div class="two">
+    <div class="card">
+      <div class="lbl"><span>the collapse</span></div>
+      <div class="ladder">
+        <div class="lrow"><span>Raw rows/sec</span><span><span class="lb" style="width:100%; background:var(--bad)">16,700</span></span><span class="v">10.7 GB/day</span></div>
+        <div class="lrow"><span>Cube rows/sec</span><span><span class="lb" style="width:4.2%; background:var(--good)">700</span></span><span class="v">0.73 GB/day</span></div>
+      </div>
+      <div class="tw" style="border:0; margin:.6rem 0 0"><table style="min-width:0">
+        <thead><tr><th>Cube arithmetic</th><th class="r">value</th></tr></thead>
+        <tbody>
+          <tr><td>active contexts per minute <span style="color:var(--ink-3)">(worked example)</span></td><td class="r">42,000</td></tr>
+          <tr><td>rows/day = 42,000 × 1,440</td><td class="r">60.5 M</td></tr>
+          <tr><td>row width in memory</td><td class="r">~60 B</td></tr>
+          <tr><td>uncompressed/day</td><td class="r">3.6 GB</td></tr>
+          <tr><td>after codecs, ~5× on sorted integer aggregates</td><td class="r">~12 B/row</td></tr>
+          <tr class="tot"><td>on disk/day</td><td class="r">~0.73 GB</td></tr>
+        </tbody>
+      </table></div>
+      <p class="cap">Cube width = distinct active contexts per minute, <b>not</b> viewer count. Doubling the audience does not widen the cube. Adding a dimension to the context tuple does. <b>42,000 is a worked-example cardinality</b>, not a measured property — it is the single input most worth establishing in shadow mode, because everything below it scales from it.</p>
+    </div>
+    <div>
+      <div class="note key"><span class="tg">Why this is the whole architecture</span><p>Attribution across 10 dimensions every 30 seconds is a set of group-bys over 42,000 rows. That is trivial. The same query over 1M per-playback rows is not. <b><span class="g" data-k="cardinality">Cardinality</span> discipline in the context tuple is not a byte-saving trick — it is what makes the detector possible at all.</b></p></div>
+      <div class="note cost"><span class="tg">Retention asymmetry</span><p>Cube rows have no identifiers and survive for years at ~0.73 GB/day, roughly 265 GB per year. Raw rows carry identifiers, cost 10.7 GB/day, and expire at 21 days. Anything you did not put in the cube schema is a question you cannot ask about last year.</p></div>
+    </div>
+  </div>
+
+  <h3>The quality cube: histograms live somewhere else</h3>
+  <div class="card">
+    <div class="lbl"><span>quality_cube · reduced dimensions, bucket counts</span><span class="sz">~2,000 rows/min</span></div>
+<pre><span class="c">-- reduced tuple on purpose: cdn, device_class, country, app_version</span>
+<span class="c">-- 16 bucket counters per metric across 42,000 context rows would</span>
+<span class="c">-- roughly double the main cube and slow the detector, for queries</span>
+<span class="c">-- the detector never runs.</span>
+
+minute_ts  cdn      device_class  country  app_ver
+           rebuffer_buckets[16]   <span class="c">// seconds in each duration bucket</span>
+           startup_buckets[16]
+           bitrate_buckets[16]
+           peak_rendition_s       <span class="c">// seconds at the top rung</span>
+           active_s
+
+<span class="c">-- p95 rebuffer comes out of the histogram, not from raw rows</span>
+<span class="c">-- avg bitrate = sum(midpoint × active_s) / sum(active_s)</span>
+<span class="c">--   NOT avg(bitrate_bucket). averaging averages weights a</span>
+<span class="c">--   one-minute viewer the same as a three-hour one.</span></pre>
+    <p class="cap">Bucket counts are <span class="g" data-k="additive">additive</span>, which is the whole reason quality is bucketed rather than stored exact. Two rows merge by summing. Exact milliseconds would need a quantile sketch per row, running to hundreds of bytes against a 60-byte cube row — so the compact form is also the only form that answers population questions cheaply.</p>
+  </div>
+
+  <h3>Supporting tables</h3>
+  <div class="two">
+    <div class="card">
+      <div class="lbl"><span>context_dim · dictionary</span><span class="sz">~180k live rows</span></div>
+<pre>context_key  device      os        app     player  proto  cdn_req  cdn_srv   isp       asn   region  conn
+<span class="hl">40871        SamsungTV21 tizen6.0  7.2.0   4.1.2   hls    edge-b   edge-b7   Comcast   7922  US-IL   ethernet</span>
+40855        SamsungTV21 tizen6.0  7.2.0   4.1.2   hls    edge-a   edge-a2   Comcast   7922  US-IL   ethernet
+40903        iPhone14    ios17.2   6.8.1   4.0.9   hls    edge-a   edge-a5   Verizon   701   US-NY   cellular
+
+<span class="c">-- all string columns LowCardinality(String)</span>
+<span class="c">-- content_id is NOT here: highest cardinality, lives on playback_interval</span></pre>
+    </div>
+    <div class="card">
+      <div class="lbl"><span>playback_attempt</span><span class="sz">~2 rows/playback</span></div>
+<pre>attempt_id  playback_id   ctx    init_ts    result    fail   startup_ms  retries
+7c1f..      8f2c41a9e7b3  40855  12:08:14   <span class="k">UNKNOWN</span>   -      -           -
+<span class="hl">7c1f..      8f2c41a9e7b3  40855  12:08:14   <span class="k">STARTED</span>   -      1840        0</span>
+9a22..      3b71c0d4f1e2  40871  12:11:09   <span class="k">FAILED</span>    DRM    -           2
+bd40..      c8e5920af7b1  40871  12:11:22   <span class="k">ABANDONED</span> -      -           1
+
+<span class="c">-- the provisional UNKNOWN row is written at initiation.</span>
+<span class="c">-- if the app dies during startup, it is all that survives —</span>
+<span class="c">-- and that is the difference between a measured abandonment</span>
+<span class="c">-- and an attempt that silently never existed.</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES LANE -->
+<div class="lanehead" id="lane">
+  <h2>The services lane: the same minute, from behind the CDN</h2>
+  <p>Stages 01–08 tell you that viewers on edge-b were hurt. They cannot tell you what was happening inside your own delivery chain while it happened. The services lane applies the SDK's discipline to backend telemetry: an OTel agent on every node compiles spans into minute records, so the incident can be read on both sides of the same clock. Components marked <em>proposed</em> do not exist upstream and would be built.</p>
+</div>
+
+<!-- STAGE S1 -->
+<section id="sv1">
+  <div class="sh"><span class="n">S1</span><h2>What the services emit</h2><span class="zb svc">services</span></div>
+  <p class="sub">At 12:10:40 the <code>edge-b3</code> cache node degraded and <code>edge-b7</code> inherited its viewers with a cold cache. Every manifest and segment miss becomes a fetch to our origin shield, and every fetch is a span.</p>
+  <div class="card">
+    <div class="lbl"><span>one span · origin-shield · 12:11:19</span><span class="sz">~520 B OTLP, uncompressed</span></div>
+<pre><span class="k">span</span>       GET /live/{ch}/media.m3u8
+<span class="k">trace_id</span>   4bf92f3577b34da6a3ce929d0e0e4736   <span class="k">span_id</span> 00f067aa0ba902b7
+<span class="k">start</span>      12:11:19.311   <span class="k">end</span> 12:11:21.402   <span class="c">// 2,091 ms</span>
+<span class="k">status</span>     ERROR   http.response.status_code = 503
+
+<span class="c">── attributes ───────────────────────────────────────</span>
+<span class="f">http.route</span>     /live/{ch}/media.m3u8
+<span class="hl"><span class="f">cdn.edge</span>       edge-b7        <span class="c">← header the CDN injects on origin fetch</span></span>
+<span class="f">cdn.cache</span>      MISS
+<span class="f">peer.service</span>   packager
+<span class="f">cloud.region</span>   us-central1
+<span class="f">cmcd.sid</span>       c3f1…9a        <span class="c">← per-playback token · evidence join only</span>
+
+<span class="c">── resource ─────────────────────────────────────────</span>
+<span class="f">service.name</span>   origin-shield   <span class="f">service.version</span> 3.14.2
+<span class="f">k8s.pod.name</span>   shield-b-4-7d9f…</pre>
+    <p class="cap">Planning assumption: <b>~140,000 critical-path spans/s</b> fleet-wide at 1M concurrent across origin shield, packager, license, entitlement and ad decisioning — about 437 per node on 320 nodes. Shipped raw, that is ~73 MB/s uncompressed and ~14.6 MB/s after compression. Nearly all of it is healthy repetition.</p>
+  </div>
+  <div class="note cost"><span class="tg">The same scaling problem, one layer down</span><p>Span volume is a property of the <em>call graph</em>, not of the viewing. Adding a child span to the packager doubles its trace bill and changes nothing about whether a viewer rebuffered — the argument from stage 01, restated for services.</p></div>
+  <div class="note care"><span class="tg">Head sampling breaks the summary</span><p>If services <span class="g" data-k="headsampling">head-sample</span> at 10%, the agent sees 10% of requests and every count it produces is a sample. Critical-path services run always-on, and the summary is computed from 100% of spans <b>before</b> any sampling decision. Where that is impossible, the record carries OTel adjusted counts and is flagged, never silently treated as complete.</p></div>
+</section>
+
+<!-- STAGE S2 -->
+<section id="sv2">
+  <div class="sh"><span class="n">S2</span><h2>The agent's minute boundary: spans become ServiceMinute</h2><span class="zb svc">services</span></div>
+  <p class="sub">The <span class="g" data-k="otelagent">OTel agent</span> on each node gets the counterpart of the SDK's minute compiler. Spans are classified against a pushed ruleset, folded into one record per key, and sealed on the UTC minute. Raw spans stay on the node.</p>
+  <div class="two-a">
+    <div class="card">
+      <div class="lbl"><span>agent collector config · per node</span><span class="sz">illustrative</span></div>
+<pre><span class="k">extensions</span>:
+  <span class="f">opamp</span>:                        <span class="c"># downward channel: rulesets, directives</span>
+    server: { ws: { endpoint: wss://control.internal/v1/opamp } }
+  <span class="f">file_storage/buf</span>: { directory: /var/lib/otelcol/buf }
+
+<span class="k">processors</span>:
+  <span class="f">memory_limiter</span>: { limit_percentage: 75 }
+  <span class="f">k8sattributes</span>: {}
+  <span class="f">transform/classify</span>:           <span class="c"># ruleset svc-7, OTTL pushed as data</span>
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["qoe.path"], "critical")
+            where attributes["http.route"] == "/live/{ch}/media.m3u8"
+  <span class="f">spanbuffer</span>:                   <span class="c"># proposed · rolling evidence buffer</span>
+    window: 5m
+    select: attributes["qoe.path"] == "critical"
+    storage: file_storage/buf
+    baseline_rate: 0.005
+
+<span class="k">connectors</span>:
+  <span class="f">forward</span>: {}
+  <span class="f">minutesummary</span>:                <span class="c"># proposed · the counterpart</span>
+    align: utc_minute
+    bucket_by: span_end
+    seal_grace: 5s
+    upload_stagger: hash(agent_id) mod 10s
+    key: [service.name, service.version, span.name,
+          cdn.edge, cloud.region, peer.service]
+    cardinality_budget: 150       <span class="c"># per agent-minute; overflow → _other</span>
+    ladder: control://ladder/v3#latency    <span class="c"># shared with the SDK</span>
+    threshold_profile: control://profiles/svc-11
+    emit_empty_minutes: true      <span class="c"># completeness, see below</span>
+
+<span class="k">service</span>:
+  pipelines:
+    <span class="f">traces/in</span>:       { receivers: [otlp],
+                       processors: [memory_limiter, k8sattributes, transform/classify],
+                       exporters: [minutesummary, forward] }  <span class="c"># 100% into both</span>
+    <span class="f">metrics/summary</span>: { receivers: [minutesummary], exporters: [otlphttp/qoe] }
+    <span class="f">traces/evidence</span>: { receivers: [forward], processors: [spanbuffer],
+                       exporters: [otlphttp/forensic] }</pre>
+      <p class="cap"><code>memory_limiter</code>, <code>k8sattributes</code>, <code>transform</code>, <code>forward</code>, <code>file_storage</code> and <code>opamp</code> are existing collector components. <b><code>minutesummary</code> and <code>spanbuffer</code> are proposed.</b> The stock <code>spanmetrics</code> connector gets part of the way — delta temporality, explicit buckets — but it emits on its own flush interval rather than on span timestamps, and has no issue classification, sequence numbers or empty-minute envelopes.</p>
+    </div>
+    <div>
+      <div class="card">
+        <div class="lbl"><span>ServiceMinute · logical form</span><span class="sz">one key, one agent</span></div>
+<div class="flist"><span class="fn">minute_ts</span>          <span class="fv">"2026-09-17T12:11:00Z"</span>
+<span class="fn">agent_id</span>           <span class="fv">shield-b-4</span>
+<span class="fn">sequence_no</span>        <span class="fv">9214</span>  <span class="fs">per agent</span>
+<span class="fn">service</span>            <span class="fv">origin-shield 3.14.2</span>
+<span class="fn">op</span>                 <span class="fv">GET media.m3u8</span>
+<span class="fn">edge</span>               <span class="fv">edge-b7</span>
+<span class="fn">region</span>             <span class="fv">us-central1</span>
+<span class="fn">peer</span>               <span class="fv">packager</span>
+<span class="fn">requests</span>           <span class="fv">1,040</span>
+<span class="fn">cache_miss</span>         <span class="fv">300</span>
+<span class="fn">errors_5xx</span>         <span class="fv">43</span>
+<span class="fn">timeouts</span>           <span class="fv">8</span>
+<span class="fn">latency_rungs</span>      <span class="fv">[40 counts]</span> <span class="fs">rungs −27…12</span>
+<span class="fn">issue_bits</span>         <span class="fv">0x03</span>  <span class="fs">LATENCY_SLO | ERROR_RATE</span>
+<span class="fn">change_flags</span>       <span class="fv">0x00</span>  <span class="fs">no deploy, scale or config push</span>
+<span class="fn">ruleset / profile</span>  <span class="fv">svc-7 / svc-11</span>
+<span class="fn">ladder_version</span>     <span class="fv">3</span></div>
+        <p class="cap">One of ~75 keys this agent sealed at 12:12:00. No trace ids, no <code>cmcd.sid</code>: identity stops at the agent, exactly as it stops at stage 08 on the client side.</p>
+      </div>
+      <div class="note key"><span class="tg">Why at the agent</span><p>The node already sees 100% of its spans, so summarising there costs no network. Summaries are <span class="g" data-k="additive">additive</span>, so merging across agents at the gateway is summation, never a quantile of quantiles. And an agent is a natural completeness unit: each has a sequence and a heartbeat.</p></div>
+    </div>
+  </div>
+
+  <h3>Same instrument, second instance</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Concern</th><th>Player SDK</th><th>OTel agent</th></tr></thead>
+    <tbody>
+      <tr><td>Record</td><td>ExperienceMinute per playback</td><td>ServiceMinute per key per agent</td></tr>
+      <tr><td>Clock</td><td>UTC wall-clock minute</td><td>UTC wall-clock minute, bucketed by span end time, sealed at :00 + 5s grace</td></tr>
+      <tr><td>Denominator</td><td>Intent seconds</td><td>Critical-path requests. The units are never added together</td></tr>
+      <tr><td>Issue vs context</td><td>Issue bitmap; <code>CDN_SWITCH</code> in context flags</td><td>Issue bitmap; deploy, scale event, config push and failover in <code>change_flags</code> — never an issue</td></tr>
+      <tr><td>Durations</td><td>Log buckets, 16 rungs</td><td>The same <span class="g" data-k="ladder">ladder</span>, a wider 40-rung window (1.08 ms to 21 s)</td></tr>
+      <tr><td>Classification</td><td>Ruleset v7, declarative, over a fixed vocabulary</td><td>Ruleset svc-7, OTTL statements over span attributes</td></tr>
+      <tr><td>Downward channel</td><td>Upload ACK</td><td><span class="g" data-k="opamp">OpAMP</span></td></tr>
+      <tr><td>Completeness</td><td><code>sequence_no</code> per playback</td><td><code>sequence_no</code> per agent; empty minutes still sent</td></tr>
+      <tr><td>Evidence</td><td>Onset buffer, flushed on directive</td><td><span class="g" data-k="spanbuffer">Span buffer</span>, flushed on directive</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note care"><span class="tg">An empty minute is not a healthy minute</span><p>An agent that handled zero requests still sends a sealed envelope with its sequence number. A missing envelope is a coverage gap — a dead node, a partitioned pod — and is reported as one. Without this rule, the node that crashed under the cache-miss storm is precisely the node whose errors disappear from the service cube.</p></div>
+  <div class="note key"><span class="tg">Backend rules change cheaply, and are versioned anyway</span><p>Agents update in hours, so tier-3 changes that would need an app release on a TV are routine here. The versioning is kept because the value is in the joint series: a ruleset change on either side creates a boundary in the aligned view, and aggregators refuse to join across it.</p></div>
+</section>
+
+<!-- STAGE S3 -->
+<section id="sv3">
+  <div class="sh"><span class="n">S3</span><h2>What crosses the wire: OTLP metrics, not a new protocol</h2><span class="zb svc">services → backend</span></div>
+  <p class="sub">The client lane needed a custom binary format because every byte on a million devices counts. The services lane does not: ServiceMinute travels as standard OTLP metrics with <span class="g" data-k="deltatemp">delta temporality</span>. Only the alignment and the bucket bounds are non-standard.</p>
+  <div class="two-a">
+    <div class="card">
+      <div class="lbl"><span>one histogram data point · OTLP metrics</span><span class="sz">~4 KB per agent-minute, compressed</span></div>
+<pre><span class="k">metric</span>  qoe.service.latency     <span class="c">// histogram, DELTA</span>
+  <span class="f">start_time</span>   2026-09-17T12:11:00.000Z   <span class="c">← pinned to the minute</span>
+  <span class="f">time</span>         2026-09-17T12:12:00.000Z
+  <span class="f">attributes</span>   service=origin-shield op="GET media.m3u8"
+               edge=edge-b7 region=us-central1 peer=packager
+  <span class="f">count</span>        1040
+  <span class="f">explicit_bounds</span>  ladder v3 rungs −27…12   <span class="c">// fixed, not per-stream</span>
+  <span class="f">bucket_counts</span>    [0,0,…,41,96,…,318,277,…,8]
+
+<span class="k">metric</span>  qoe.service.requests    <span class="c">// sum, DELTA, by outcome</span>
+<span class="k">metric</span>  qoe.service.issues      <span class="c">// gauge, bitmap</span>
+<span class="k">resource</span> agent_id=shield-b-4  seq=9214  ruleset=svc-7  ladder=3
+
+<span class="k">upload at</span>  12:12:05 + (hash(agent_id) mod 10)s</pre>
+    </div>
+    <div>
+      <div class="note care"><span class="tg">Why not exponential histograms</span><p>OTLP's exponential histograms are compact and mergeable, but they rescale per stream. Two streams at different scales do not share boundaries, and neither shares them with the client ladder. Fixed explicit bounds from one ladder is what lets a client segment-download bucket and a server response bucket mean the same interval.</p></div>
+      <div class="note key"><span class="tg">Stagger, smaller</span><p>Hundreds of agents, not millions of devices, so a 10-second spread is enough. Same rule as stage 05: the offset hashes the agent id, never a region or edge, so a collector hiccup cannot impersonate a regional incident.</p></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ladder">
+      <div class="lrow"><span>All spans, compressed</span><span><span class="lb" style="width:100%; background:var(--bad)">14.6 MB/s</span></span><span class="v">1×</span></div>
+      <div class="lrow"><span>Evidence: 0.5% baseline</span><span><span class="lb" style="width:.5%; min-width:3px; background:var(--warn)"></span></span><span class="v">~73 KB/s</span></div>
+      <div class="lrow"><span>Minute summaries</span><span><span class="lb" style="width:.16%; min-width:3px; background:var(--good)"></span></span><span class="v">~23 KB/s</span></div>
+    </div>
+    <p class="cap"><b>Planning arithmetic, not a benchmark.</b> 320 agents × ~75 series × ~350 B per OTLP series, compressed ~6×. The multiple against shipping every span is large and should not be quoted; what matters is that summary volume scales with <em>distinct keys</em>, and that raw spans now leave the node only when selected.</p>
+  </div>
+</section>
+
+<!-- STAGE S4 -->
+<section id="sv4">
+  <div class="sh"><span class="n">S4</span><h2>Ingest: the service cube</h2><span class="zb srv">backend · storage</span></div>
+  <p class="sub">Summaries from every agent for the same key and minute merge by summation into one row. The agent dimension is dropped from the cube and kept only in the coverage table.</p>
+  <div class="two-a">
+    <div class="card">
+      <div class="lbl"><span>service_minute_cube · AggregatingMergeTree</span><span class="sz">~4,800 rows/min</span></div>
+<pre><span class="k">CREATE TABLE</span> service_minute_cube
+(
+  minute_ts      <span class="n">DateTime</span>,
+  service_key    <span class="n">UInt32</span>,   <span class="c">-- dim_service: name, version, cluster</span>
+  op_key         <span class="n">UInt32</span>,
+  <span class="hl">  edge_key       <span class="n">UInt32</span>,   <span class="c">-- dim_edge: CONFORMED with context_dim</span></span>
+  region_key     <span class="n">UInt16</span>,   <span class="c">-- dim_region: CONFORMED</span>
+  peer_key       <span class="n">UInt32</span>,
+  policy_key     <span class="n">UInt16</span>,   <span class="c">-- ruleset, profile, ladder</span>
+  requests       <span class="n">SimpleAggregateFunction</span>(sum, UInt64),
+  cache_miss     <span class="n">SimpleAggregateFunction</span>(sum, UInt64),
+  errors_5xx     <span class="n">SimpleAggregateFunction</span>(sum, UInt64),
+  timeouts       <span class="n">SimpleAggregateFunction</span>(sum, UInt64),
+  latency_rungs  <span class="n">AggregateFunction</span>(sumForEach, Array(UInt64)),
+  issue_bits     <span class="n">SimpleAggregateFunction</span>(groupBitOr, UInt8),
+  change_flags   <span class="n">SimpleAggregateFunction</span>(groupBitOr, UInt8)
+)
+<span class="k">ENGINE</span> = AggregatingMergeTree
+<span class="k">ORDER BY</span> (minute_ts, edge_key, service_key, op_key);</pre>
+    </div>
+    <div class="card">
+      <div class="lbl"><span>agent_coverage</span><span class="sz">1 row per agent per minute</span></div>
+<pre>minute_ts  cluster     expected  received  gaps
+12:10      shield-b    40        40        -
+<span class="hl">12:11      shield-b    40        38        shield-b-2, shield-b-9</span>
+12:12      shield-b    40        39        shield-b-9
+
+<span class="c">-- missing agents are named, not zeroed.</span>
+<span class="c">-- coverage is reported per cluster and region,</span>
+<span class="c">-- never pooled into one number.</span></pre>
+      <p class="cap">Two shield-b agents went quiet during the storm. The cube for 12:11 is therefore a lower bound on edge-b's error count, and the aligned view says so.</p>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="chip">~4,800 rows/min → <b>80 rows/s</b></span>
+    <span class="chip">6.9 M rows/day</span>
+    <span class="chip">~40 B/row on disk</span>
+    <span class="chip"><b>~0.28 GB/day</b>, months of retention</span>
+  </div>
+  <div class="note care"><span class="tg">The join lives or dies on one dimension table</span><p>The client lane's <code>cdn_served</code> is resolved from the connection at stage 06. The services lane's <code>cdn.edge</code> comes from a header the CDN injects. If one says <code>edge-b7</code> and the other <code>b7.chi.cdnprovider.net</code>, the join returns nothing and looks like health. Both resolve into one owned <span class="g" data-k="conformed">conformed</span> <code>dim_edge</code>, and an unmapped value is counted and alerted, not dropped.</p></div>
+</section>
+
+<!-- STAGE S5 -->
+<section id="sv5">
+  <div class="sh"><span class="n">S5</span><h2>The aligned minute: one join, two instruments</h2><span class="zb srv">backend · analysis</span></div>
+  <p class="sub">Because both lanes bucket on the same UTC minute and resolve into the same edge and region keys, putting them side by side is a join on coordinates. No trace ids, no viewer ids, no sampling.</p>
+  <div class="card">
+    <div class="lbl"><span>aligned view · cohort edge-b</span></div>
+<pre><span class="k">WITH</span> client <span class="k">AS</span> (
+  <span class="k">SELECT</span> minute_ts, d.edge_key,
+         <span class="k">sum</span>(impacted_opportunity_s) / <span class="k">sum</span>(opportunity_s) <span class="k">AS</span> client_rate
+  <span class="k">FROM</span> minute_cube c <span class="k">JOIN</span> context_dim d <span class="k">USING</span> (context_key)
+  <span class="k">GROUP BY</span> minute_ts, edge_key),
+svc <span class="k">AS</span> (
+  <span class="k">SELECT</span> minute_ts, edge_key,
+         <span class="k">sum</span>(requests) / 60                    <span class="k">AS</span> fetch_rps,
+         1 - <span class="k">sum</span>(cache_miss) / <span class="k">sum</span>(requests)    <span class="k">AS</span> hit_ratio,
+         ladderQuantile(0.95, <span class="k">sumForEachMerge</span>(latency_rungs)) <span class="k">AS</span> p95,
+         <span class="k">sum</span>(errors_5xx) / <span class="k">sum</span>(requests)       <span class="k">AS</span> err_rate
+  <span class="k">FROM</span> service_minute_cube <span class="k">JOIN</span> dim_service <span class="k">USING</span> (service_key)
+  <span class="k">WHERE</span> service_name = <span class="s">'origin-shield'</span>
+  <span class="k">GROUP BY</span> minute_ts, edge_key)
+<span class="k">SELECT</span> * <span class="k">FROM</span> client <span class="k">JOIN</span> svc <span class="k">USING</span> (minute_ts, edge_key)
+<span class="k">WHERE</span> policies_compatible(client, svc);   <span class="c">-- series boundary on either side</span></pre>
+    <p class="cap"><code>ladderQuantile</code> and <code>policies_compatible</code> are functions of the shared metric layer, not built-ins. The quantile is resolved to a rung, so the p95 below is a range, not a number.</p>
+  </div>
+  <div class="tw"><table>
+    <thead><tr><th class="m">minute</th><th class="r">client impacted<br>rate · edge-b, all apps</th><th class="r">shield fetches/s<br>from edge-b</th><th class="r">shield hit<br>ratio</th><th class="r">origin p95<br>(rung)</th><th class="r">5xx</th><th class="r">agents</th></tr></thead>
+    <tbody>
+      <tr><td class="m">12:08</td><td class="r">4.1%</td><td class="r">38</td><td class="r">98.1%</td><td class="r">92–118 ms</td><td class="r">0.1%</td><td class="r">40/40</td></tr>
+      <tr><td class="m">12:09</td><td class="r">4.2%</td><td class="r">41</td><td class="r">98.0%</td><td class="r">92–118 ms</td><td class="r">0.1%</td><td class="r">40/40</td></tr>
+      <tr><td class="m">12:10</td><td class="r">4.3%</td><td class="r warm">212</td><td class="r warm">90.4%</td><td class="r warm">247–316 ms</td><td class="r warm">0.6%</td><td class="r">40/40</td></tr>
+      <tr class="hlr"><td class="m">12:11</td><td class="r hot">11.8%</td><td class="r hot">690</td><td class="r hot">71.2%</td><td class="r hot">1.78–2.27 s</td><td class="r hot">4.1%</td><td class="r">38/40</td></tr>
+      <tr><td class="m">12:12</td><td class="r hot">12.2%</td><td class="r hot">710</td><td class="r hot">70.5%</td><td class="r hot">1.78–2.27 s</td><td class="r hot">4.4%</td><td class="r">39/40</td></tr>
+      <tr><td class="m" style="color:var(--ink-3)">12:11 · edge-a</td><td class="r">4.1%</td><td class="r">44</td><td class="r">98.2%</td><td class="r">92–118 ms</td><td class="r">0.1%</td><td class="r">40/40</td></tr>
+    </tbody>
+  </table></div>
+  <p class="cap" style="margin-bottom:1.1rem"><b>The services lane moved a minute first.</b> At 12:10 the shield was already absorbing a fivefold fetch surge while players drained their buffers; at 12:11 the buffers ran out. The client rate matches the <code>cdn=edge-b (all apps)</code> row in stage 10; the 22.4% cohort is its 7.2.0 slice, which the services lane cannot see because app version is not a conformed dimension. The edge-a row is the control: the shared origin is fine for everyone else, so the degradation is specific to the edge-b path.</p>
+
+  <h3>What the combination tells you</h3>
+  <div class="tw"><table class="mx">
+    <thead><tr><th></th><th>Services degraded, same minute, same edge or region</th><th>Services clean</th></tr></thead>
+    <tbody>
+      <tr><th>Viewers impacted</th><td><b>Delivery-chain candidate.</b> Report the service key as a contributing path alongside the cohort. This incident.</td><td><b>Beyond our services.</b> CDN edge behaviour, ISP, last mile or device. Stage 10's ISP and device attribution carries the weight.</td></tr>
+      <tr><th>Viewers fine</th><td><b>Absorbed.</b> Buffers, retries and caching hid it. An early warning and an SLO page, never a QoE page.</td><td>Nothing to do.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note key"><span class="tg">It still does not claim cause</span><p>Two aligned minute series moving together, with one leading, is much stronger evidence than a cohort alone — and it is still correlation over aggregates. The alert says which service path moved with the cohort and in what order. The trace evidence in stage 10 is what an engineer uses to confirm it.</p></div>
+  <div class="note win"><span class="tg">No cost to the latency budget</span><p>A service minute is sealed at :00 + 5s and uploaded within 10s, so it lands around 20 seconds after the minute ends. The client lane's p95 arrival is 102 seconds. By the time the client window seals, the matching service rows have been waiting for over a minute — the join adds nothing to the 292s in stage 10.</p></div>
+  <div class="note care"><span class="tg">QoE pages still come from the client lane</span><p>The service cube keeps its own SLO alerting, on its own units. It never pages on viewer experience and never contributes seconds to a QoE KPI. Requests and opportunity seconds are different quantities, and the aligned view shows them side by side rather than adding them.</p></div>
+</section>
+
+<!-- STAGE 9 -->
+<section id="s9">
+  <div class="sh"><span class="n">09</span><h2>Detection: two tests that never gate each other</h2><span class="zb srv">backend · analysis</span></div>
+  <p class="sub">The detector reads the cube. It runs a seasonal-baseline comparison and a mix-shift comparison, independently, every 30 seconds.</p>
+
+  <h3>Signal against baseline</h3>
+  <div class="svgbox">
+    <svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Issue rate versus seasonal baseline, showing a step change at 12:11">
+      <defs>
+        <linearGradient id="bandg" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="currentColor" stop-opacity=".18"/>
+          <stop offset="100%" stop-color="currentColor" stop-opacity=".06"/>
+        </linearGradient>
+      </defs>
+      <g color="var(--accent)">
+        <!-- baseline band -->
+        <path d="M60,196 L120,193 L180,191 L240,190 L300,189 L360,188 L420,188 L480,187 L540,187 L600,186 L660,186 L720,185 L780,185 L840,185 L840,213 L780,213 L720,213 L660,214 L600,214 L540,215 L480,215 L420,216 L360,216 L300,217 L240,218 L180,219 L120,221 L60,224 Z" fill="url(#bandg)"/>
+        <path d="M60,210 L180,205 L300,203 L420,202 L540,201 L660,200 L840,199" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4" opacity=".75"/>
+      </g>
+      <!-- axes -->
+      <g stroke="var(--line-2)" stroke-width="1">
+        <line x1="60" y1="30" x2="60" y2="230"/><line x1="60" y1="230" x2="860" y2="230"/>
+      </g>
+      <g fill="var(--ink-3)" font-family="IBM Plex Mono, monospace" font-size="10">
+        <text x="16" y="235">0%</text><text x="16" y="175">10%</text><text x="16" y="115">20%</text><text x="16" y="55">30%</text>
+        <text x="52" y="248">12:00</text><text x="292" y="248">12:05</text><text x="532" y="248">12:10</text><text x="772" y="248">12:15</text>
+      </g>
+      <!-- observed -->
+      <polyline fill="none" stroke="var(--bad)" stroke-width="2.4" stroke-linejoin="round"
+        points="60,211 108,207 156,212 204,205 252,209 300,203 348,208 396,204 444,207 492,202 540,205 588,118 636,96 684,101 732,94 780,99 828,92"/>
+      <!-- onset marker -->
+      <line x1="564" y1="30" x2="564" y2="230" stroke="var(--warn)" stroke-width="1.4" stroke-dasharray="4 3"/>
+      <text x="570" y="44" fill="var(--warn)" font-family="IBM Plex Mono, monospace" font-size="10">onset 12:11</text>
+      <!-- labels -->
+      <text x="620" y="140" fill="var(--bad)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="500">observed 22.4%</text>
+      <text x="200" y="192" fill="var(--accent)" font-family="IBM Plex Sans, sans-serif" font-size="11">seasonal baseline ± band</text>
+      <text x="620" y="192" fill="var(--accent)" font-family="IBM Plex Sans, sans-serif" font-size="11">expected 4.1%</text>
+    </svg>
+  </div>
+  <p class="cap" style="margin-bottom:1.2rem">Cohort <b>edge-b · app 7.2.0</b>, content issue rate — the complement of <span class="g" data-k="issuefree">Issue-Free Opportunity&nbsp;%</span>. The <span class="g" data-k="baseline">seasonal baseline</span> is modelled on time-of-week, platform class, geography and live-event state, with sparse cohorts <span class="g" data-k="pooling">pooled</span> toward their parent. A flat baseline would fire every evening at prime time; a trailing average would absorb this step and never fire.</p>
+
+  <div class="card">
+    <div class="lbl"><span>detector query · runs every 30s over the cube</span></div>
+<pre><span class="k">SELECT</span>
+  c.context_key,
+  <span class="k">sum</span>(c.impacted_opportunity_s) / <span class="k">sum</span>(c.opportunity_s)  <span class="k">AS</span> observed_rate,
+  <span class="k">any</span>(b.expected_rate)                                   <span class="k">AS</span> expected_rate,
+  <span class="k">sum</span>(c.opportunity_s)                                   <span class="k">AS</span> opportunity_s,
+  (observed_rate - expected_rate) * opportunity_s         <span class="k">AS</span> <span class="f">excess_impacted_s</span>
+<span class="k">FROM</span> minute_cube c
+<span class="k">JOIN</span> baseline_seasonal b <span class="k">USING</span> (context_key, tow_bucket, policy_key)
+<span class="k">WHERE</span> minute_ts <span class="k">BETWEEN</span> <span class="s">'12:09:00'</span> <span class="k">AND</span> <span class="s">'12:13:00'</span>       <span class="c">-- <span class="g" data-k="sealed">sealed window</span></span>
+  <span class="k">AND</span> b.support_minutes &gt; 5000                             <span class="c">-- no baseline, no alert</span>
+<span class="k">GROUP BY</span> c.context_key
+<span class="k">HAVING</span> excess_impacted_s &gt; 50000 <span class="k">AND</span> opportunity_s &gt; 200000  <span class="c">-- floors</span>
+<span class="k">ORDER BY</span> excess_impacted_s <span class="k">DESC</span>;</pre>
+  </div>
+
+  <h3>Test A — did the population change? Test B — did cohorts degrade?</h3>
+  <div class="two">
+    <div class="card">
+      <div class="lbl"><span>A · <span class="g" data-k="mixshift">mix shift</span></span><span class="sz">composition by app version</span></div>
+      <div style="display:grid; gap:.55rem; font-size:.78rem">
+        <div>
+          <div style="color:var(--ink-3); font-family:'IBM Plex Mono',monospace; margin-bottom:.25rem">12:00 reference</div>
+          <div style="display:flex; height:1.5rem; border-radius:2px; overflow:hidden">
+            <div style="flex:61; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:.66rem">6.8.1 · 61%</div>
+            <div style="flex:35; background:var(--blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:.66rem">7.0.4 · 35%</div>
+            <div style="flex:4; background:var(--bad)"></div>
+          </div>
+        </div>
+        <div>
+          <div style="color:var(--ink-3); font-family:'IBM Plex Mono',monospace; margin-bottom:.25rem">12:20 observed</div>
+          <div style="display:flex; height:1.5rem; border-radius:2px; overflow:hidden">
+            <div style="flex:44; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:.66rem">6.8.1 · 44%</div>
+            <div style="flex:25; background:var(--blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:.66rem">7.0.4 · 25%</div>
+            <div style="flex:31; background:var(--bad); color:#fff; display:flex; align-items:center; justify-content:center; font-size:.66rem">7.2.0 · 31%</div>
+          </div>
+        </div>
+      </div>
+      <p class="cap"><b>Verdict: mix shift confirmed.</b> App 7.2.0 went from 4% to 31% of traffic during a staged rollout.</p>
+    </div>
+    <div class="card">
+      <div class="lbl"><span>B · within-cohort, each against its own baseline</span></div>
+      <div class="tw" style="border:0"><table style="min-width:0">
+        <thead><tr><th class="m">cohort</th><th class="r">base</th><th class="r">obs</th><th class="r">Δ</th></tr></thead>
+        <tbody>
+          <tr><td class="m">6.8.1 · edge-a</td><td class="r">4.0%</td><td class="r">4.2%</td><td class="r" style="color:var(--good)">+0.2</td></tr>
+          <tr><td class="m">7.0.4 · edge-a</td><td class="r">4.3%</td><td class="r">4.4%</td><td class="r" style="color:var(--good)">+0.1</td></tr>
+          <tr><td class="m">7.2.0 · edge-a</td><td class="r">4.1%</td><td class="r">4.6%</td><td class="r" style="color:var(--warn)">+0.5</td></tr>
+          <tr class="hlr"><td class="m">7.2.0 · edge-b</td><td class="r">4.1%</td><td class="r">22.4%</td><td class="r" style="color:var(--bad)">+18.3</td></tr>
+        </tbody>
+      </table></div>
+      <p class="cap"><b>Verdict: real regression, localized to edge-b.</b> The 7.2.0 cohort on edge-a is fine, so this is not a bad app release.</p>
+    </div>
+  </div>
+  <div class="note key"><span class="tg">Why both tests must run</span><p>A rule that says "if mix adjustment absorbs the aggregate move, classify as mix shift" would have <b>suppressed this alert entirely</b> — the growing cohort and the degrading cohort are the same cohort. Staged rollouts, CDN migrations, new device launches and geographic expansions all have this shape, and they are the most common causes of real regressions. Two independent tests, both always reported.</p></div>
+</section>
+
+<!-- STAGE 10 -->
+<section id="s10">
+  <div class="sh"><span class="n">10</span><h2>Attribution, alert, and pulling the evidence</h2><span class="zb both">backend → device</span></div>
+
+  <h3>Worst rate is not worst impact</h3>
+  <p style="font-size:.88rem; color:var(--ink-2)">Cohorts are ranked by <span class="g" data-k="excess">excess impact</span>, not by rate.</p>
+  <div class="tw"><table>
+    <thead><tr><th class="m">candidate cohort</th><th class="r">rate</th><th class="r">baseline</th><th class="r">opportunity<br>seconds</th><th class="r">excess<br>impacted s</th><th class="barcell">share of total excess</th><th class="r">traffic</th></tr></thead>
+    <tbody>
+      <tr><td class="m">isp=Starlink · region=US-MT</td><td class="r">31.0%</td><td class="r">6.0%</td><td class="r">182,000</td><td class="r">45,500</td><td><span class="bar b4" style="width:3%"></span></td><td class="r">0.2%</td></tr>
+      <tr class="hlr"><td class="m">cdn=edge-b · app=7.2.0</td><td class="r">22.4%</td><td class="r">4.1%</td><td class="r">8,420,000</td><td class="r">1,540,860</td><td><span class="bar b2" style="width:100%"></span></td><td class="r">7.1%</td></tr>
+      <tr><td class="m">cdn=edge-b (all apps)</td><td class="r">11.8%</td><td class="r">4.2%</td><td class="r">19,300,000</td><td class="r">1,466,800</td><td><span class="bar b2" style="width:95%"></span></td><td class="r">16.3%</td></tr>
+      <tr><td class="m">device=TizenTV2019</td><td class="r">9.1%</td><td class="r">7.8%</td><td class="r">4,100,000</td><td class="r">53,300</td><td><span class="bar" style="width:3.5%"></span></td><td class="r">3.5%</td></tr>
+      <tr><td class="m">region=US-IL</td><td class="r">8.4%</td><td class="r">4.4%</td><td class="r">6,900,000</td><td class="r">276,000</td><td><span class="bar" style="width:18%"></span></td><td class="r">5.8%</td></tr>
+    </tbody>
+  </table></div>
+  <p class="cap" style="margin-bottom:1.1rem">Starlink in Montana has the worst rate by a wide margin and is <b>3% of the problem</b>. Ranking by rate sends the on-call engineer to the wrong place. Ranking by <b>absolute excess impacted seconds</b> sends them to edge-b. The <code>region=US-IL</code> row is the same incident viewed through a correlated dimension, which is why the system reports <em>contributing</em> cohorts and never claims cause.</p>
+
+  <div class="card">
+    <div class="lbl"><span>alert emitted · 12:15:52Z</span><span class="sz">sealed window 12:09–12:13</span></div>
+<pre><span class="k">INCIDENT</span> inc-4471  <span class="k">severity</span>=high  <span class="k">confirmed</span>=3 windows
+
+  <span class="f">contributing_cohort</span>  cdn=edge-b AND app_version=7.2.0
+  <span class="f">explains</span>             38% of excess rebuffer impact
+  <span class="f">traffic_share</span>        7.1% of viewing opportunity
+  <span class="f">excess_impact</span>        1,540,860 impacted opportunity-seconds
+  <span class="f">onset_estimate</span>       12:11:00Z
+  <span class="f">mix_note</span>             app 7.2.0 grew 4%→31% (staged rollout);
+                        7.2.0 on edge-a is within baseline
+
+  <span class="f">services_lane</span>        <span class="c">// stage S5, same sealed window</span>
+    <span class="f">moved_with_cohort</span>  origin-shield · GET media.m3u8 · edge=edge-b7
+    <span class="f">hit_ratio</span>          98.0% → 71.2%
+    <span class="f">fetch_rate</span>         41/s → 690/s
+    <span class="f">p95</span>                92–118 ms → 1.78–2.27 s
+    <span class="f">5xx</span>                0.1% → 4.1%   <span class="c">// lower bound: 38/40 agents</span>
+    <span class="f">order</span>              services moved 12:10, viewers 12:11
+    <span class="f">control</span>            edge-a path within baseline
+
+  <span class="c">// no causal claim. "contributing", not "caused by".</span>
+  <span class="c">// services_lane is corroboration, attached, never a trigger.</span></pre>
+  </div>
+
+  <h3>The clock, honestly</h3>
+  <div class="tlw">
+    <div class="tl" style="height:2.4rem">
+      <div style="flex:102; background:var(--accent)">102s seal wait + stagger</div>
+      <div style="flex:10; background:var(--blue)">10s</div>
+      <div style="flex:20; background:var(--accent)">20s agg</div>
+      <div style="flex:30; background:var(--blue)">30s detect</div>
+      <div style="flex:120; background:var(--warn)">120s confirmation · 2 windows</div>
+      <div style="flex:10; background:var(--good)">10s</div>
+    </div>
+    <div class="tlx"><span style="flex:102">T+0</span><span style="flex:10"></span><span style="flex:20">T+112</span><span style="flex:30">T+132</span><span style="flex:120">T+162</span><span style="flex:10">T+282</span></div>
+  </div>
+  <div class="note care" style="margin-top:.9rem"><span class="tg">Confirmation is 41% of the budget</span><p>It is also the only thing preventing an alert on one noisy window. <b>The detection-latency SLO and the false-positive budget are the same dial.</b> Total onset-to-alert: <b>292s ≈ 4.9 min</b>, against a 5-minute <span class="g" data-k="p95">p95</span> target — about 8 seconds of headroom left. Any request to tighten five minutes to two is a request to accept more false alerts, and should be decided as one question with both numbers written down.</p></div>
+
+  <div class="card">
+    <div class="lbl"><span>T+350s · the next upload ACK for a matching viewer</span></div>
+<pre><span class="k">200 OK</span>
+{
+  <span class="f">"accepted"</span>: 5,
+  <span class="f">"clock_offset_ms"</span>: -412,
+  <span class="f">"targeting"</span>: {
+    <span class="f">"policy_id"</span>: <span class="s">"fp-inc4471"</span>,
+    <span class="f">"action"</span>: <span class="s">"flush_buffer_and_capture"</span>,
+    <span class="f">"batch_interval_s"</span>: 10,
+    <span class="f">"expiry_ts"</span>: <span class="s">"2026-09-17T12:45:00Z"</span>,
+    <span class="f">"capture_budget_mb"</span>: 4,
+    <span class="f">"signature"</span>: <span class="s">"ed25519:9f3a…"</span>
+  }
+}</pre>
+    <p class="cap"><b>The client never evaluated a <span class="g" data-k="predicate">cohort predicate</span>.</b> It could not: it does not know it is on <code>edge-b7</code>, or that its ISP is Comcast, or that it is in US-IL. The server matched on dimensions it resolved itself in stage 6 and attached the directive to a response the client was already going to receive.</p>
+  </div>
+  <div class="card">
+    <div class="lbl"><span>T+300s · the same policy, sent to the service agents over OpAMP</span></div>
+<pre><span class="k">remote config</span> → agents in clusters serving edge-b
+{
+  <span class="f">"policy_id"</span>: <span class="s">"fp-inc4471"</span>,
+  <span class="f">"action"</span>: <span class="s">"flush_span_buffer"</span>,
+  <span class="f">"select"</span>: <span class="s">"cdn.edge == 'edge-b7' and qoe.path == 'critical'"</span>,
+  <span class="f">"sample_rate"</span>: 0.05,
+  <span class="f">"always_keep"</span>: <span class="s">"cmcd.sid in targeted_set"</span>,
+  <span class="f">"expiry_ts"</span>: <span class="s">"2026-09-17T12:45:00Z"</span>,
+  <span class="f">"capture_budget_mb"</span>: 400,
+  <span class="f">"signature"</span>: <span class="s">"ed25519:9f3a…"</span>
+}</pre>
+    <p class="cap"><b>One policy, two channels.</b> The control plane fans <code>fp-inc4471</code> out to the ACK for players and to OpAMP for agents. Each agent flushes the matching spans from its five-minute buffer — which still holds the 12:10 onset — and the forensic tier reassembles traces by <code>trace_id</code>. The targeted players' <span class="g" data-k="cmcd">CMCD</span> <code>sid</code> links their forensic timelines to the exact requests that served them; that mapping exists only inside the access-audited forensic tier.</p>
+  </div>
+  <div class="note care"><span class="tg">The join key has a delivery cost</span><p>Putting <code>sid</code> on segment requests as a query argument changes the CDN cache key unless the CDN is configured to ignore it — which would turn every segment into a miss. Sending it as a header avoids that but triggers CORS preflights on web players. Decide per platform, alongside the CMCD privacy review already open in the specification.</p></div>
+  <div class="note cost"><span class="tg">Partial traces</span><p>A trace crosses several nodes, and each agent holds only its own spans. An agent that missed the directive, restarted, or aged the spans out leaves a hole in the reassembled trace. Holes are marked, not papered over, and buffer length is sized from measured OpAMP propagation latency, not a guess.</p></div>
+  <div class="note cost"><span class="tg">What this cannot retrieve</span><p>Viewers who quit at 12:12 never send another batch and never receive the directive. The forensic sample is therefore biased toward the tolerant. Continuous low-rate baseline sampling and the universal <code>PlaybackAttempt</code> stream reduce that bias; nothing eliminates it.</p></div>
+</section>
+
+<!-- STAGE A -->
+<section id="sa">
+  <div class="sh"><span class="n">A</span><h2>Afterwards: the same minutes, off the cluster</h2><span class="zb srv">backend · analytics</span></div>
+  <p class="sub">Stages 09–10 answer "what is happening now" on ClickHouse. The postmortem asks something else — has this happened before, to whom, how often — and that question should not run on the machine that pages people. Every hour the sealed tiers land as Parquet on object storage, and any slice loads into a local DuckDB.</p>
+  <div class="two">
+    <div class="card">
+      <div class="lbl"><span>archive layout · object storage</span><span class="sz">hourly, after sealing</span></div>
+<pre>qoe-archive/
+  <span class="f">minute/</span>        date=2026-09-17/hour=12/   <span class="c">~460 MB/h · per playback</span>
+  <span class="f">minute_cube/</span>   date=…/hour=…/             <span class="c">~30 MB/h · cohorts start here</span>
+  <span class="f">interval/</span>  <span class="f">attempt/</span>  <span class="f">service_cube/</span>      <span class="c">~40 MB/h</span>
+  <span class="f">dims/</span>          context_dim · dim_edge · asset   <span class="c">append-only</span>
+  <span class="f">macros/</span>        qoe_metrics_v7.sql         <span class="c">the dashboards' definitions</span></pre>
+      <p class="cap"><code>session_id</code> and <code>device_id</code> are dropped at export. <code>playback_id</code> is re-keyed with a key that rotates daily and is then destroyed, so a playback stays coherent within a day and cannot be followed across days.</p>
+    </div>
+    <div class="card">
+      <div class="lbl"><span>a week later · analyst or agent, on a laptop</span></div>
+<pre><span class="k">.read</span> qoe_metrics_v7.sql
+<span class="k">CREATE TABLE</span> edgeb <span class="k">AS</span>
+<span class="k">SELECT</span> c.*, d.app_version
+<span class="k">FROM</span> read_parquet(<span class="s">'s3://qoe-archive/minute_cube/date=2026-0[6-9]-*/*/*'</span>) c
+<span class="k">JOIN</span> read_parquet(<span class="s">'s3://qoe-archive/dims/context_dim.parquet'</span>) d
+     <span class="k">USING</span> (context_key)
+<span class="k">WHERE</span> d.cdn = <span class="s">'edge-b'</span>;               <span class="c">-- 90 days, ~4 GB, once</span>
+
+<span class="k">SELECT</span> date_trunc(<span class="s">'hour'</span>, minute_ts) <span class="k">AS</span> hr, app_version,
+       <span class="f">impacted_rate</span>(impacted_opportunity_s, opportunity_s) <span class="k">AS</span> rate
+<span class="k">FROM</span> edgeb <span class="k">GROUP BY ALL</span>
+<span class="k">HAVING</span> rate &gt; 0.08 <span class="k">ORDER BY</span> hr;
+
+<span class="c">  hr                 app     rate</span>
+<span class="c">  2026-07-12 19:00   7.0.4    8.9%</span>
+<span class="c">  2026-08-23 20:00   7.1.1    9.7%</span>
+<span class="c">  2026-09-17 12:00   7.2.0   11.4%</span></pre>
+      <p class="cap"><b>Illustrative output.</b> Two earlier edge-b episodes, both on live-match evenings, both below the paging floor. The pattern was in the data before the incident; nobody had asked. <code>impacted_rate</code> is a macro from the pack — sum over sum, never an average of averages.</p>
+    </div>
+  </div>
+  <div class="note key"><span class="tg">ClickHouse keeps the pager</span><p>The detector, dashboards, incident drill-down and the aligned view read ClickHouse. Exploration — by people or by an analytics agent — reads the archive. The two never compete for CPU, and the cluster is sized for monitoring rather than for curiosity.</p></div>
+  <div class="note win"><span class="tg">What it costs</span><p>About 13 GB of Parquet a day; ~5 TB for thirteen months on object storage, roughly $100–120 a month at list price. The working set for a question like this one is a few gigabytes. Planning arithmetic, to be replaced with shadow-phase measurements.</p></div>
+  <div class="note care"><span class="tg">Same numbers, or no numbers</span><p>The agent and the analyst compute KPIs through the same versioned macro pack as the dashboards, and the pack refuses to mix policy versions. Sample by a hash of the archive key, never by row, or per-playback questions silently break. A laptop outside the cloud region pays egress; heavy users run DuckDB on an in-region VM.</p></div>
+</section>
+
+<!-- STAGE 11 -->
+<section id="s11">
+  <div class="sh"><span class="n">11</span><h2>The ledger: what each step cost you</h2></div>
+  <p class="sub">Every compression is a question you can no longer answer. Written down, once, so nobody rediscovers it during an incident.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Discarded at</th><th>What went</th><th>Question you can no longer ask</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td class="m">03 · reduction</td><td>Playback positions, buffer levels, dropped frames, event interleaving</td><td>"Did the rebuffer happen at a segment boundary?"</td><td>Forensic tier, sampled and targeted</td></tr>
+      <tr><td class="m">04 · packing</td><td>Exact <code>rebuffer_ms</code> → log bucket</td><td>"Re-run last quarter with a 2s rebuffer threshold"</td><td>Buckets permit re-thresholding at bucket resolution; a boolean would permit none</td></tr>
+      <tr><td class="m">04 · packing</td><td>Sub-minute ordering within the bucket</td><td>"Which came first, the failover or the stall?"</td><td>Forensic tier only</td></tr>
+      <tr><td class="m">04 · packing</td><td>Exact bitrate → log bucket</td><td>"What exactly was this viewer receiving at 12:11:34?"</td><td>Forensic tier. Bucket midpoints carry ~±4% error on the population mean — fine for CDN cost, not for contractual terms</td></tr>
+      <tr><td class="m">06 · reclassification</td><td>Intent seconds past the stall threshold</td><td>"How long did the abandoned session sit spinning?"</td><td>Deliberate. Uncapped, walked-away sessions would dominate every impact ranking</td></tr>
+      <tr><td class="m">08 · cube</td><td>All identifiers; per-playback rows</td><td>"Show me this viewer's session last March"</td><td>Deliberate. Raw tier answers it for 21 days. The archive keeps a day-scoped key: "this playback's day" survives for 13 months, "this viewer" does not</td></tr>
+      <tr><td class="m">08 · cube</td><td>Any dimension absent from the context tuple</td><td>"Break last year down by content genre"</td><td>Partly recovered. Anything a record carries — content on intervals, joined to the asset catalogue — can be broken down from the archive (stage A) for 13 months. Dimensions never recorded stay gone</td></tr>
+      <tr><td class="m">A · archive</td><td>Session and device IDs; identity across days</td><td>"How many days did this viewer come back after the incident?"</td><td>Deliberate. Distinct-count sketches in the interval rollups answer it in aggregate</td></tr>
+      <tr><td class="m">10 · targeting</td><td>Sessions that abandoned before the ACK</td><td>"What did the people who left actually see?"</td><td>Baseline sampling; attempt records; accept residual bias</td></tr>
+      <tr><td class="m">S2 · summary</td><td>Per-request identity; attributes outside the key</td><td>"Which exact request for this viewer returned 503?"</td><td>Span buffer plus CMCD <code>sid</code>, targeted only</td></tr>
+      <tr><td class="m">S2 · summary</td><td>Exact latency → ladder rung</td><td>"Was p99.9 above 4.2 seconds?"</td><td>Rung resolution only; the ratio is 1.28, so roughly ±12% on any quantile</td></tr>
+      <tr><td class="m">S2 · budget</td><td>Keys beyond the per-agent cardinality budget, folded into <code>_other</code></td><td>"Which route inside <code>_other</code> degraded?"</td><td>Overflow counts are monitored; a sustained overflow is a budget change, not a silent loss</td></tr>
+      <tr><td class="m">S5 · join</td><td>Everything that is not a conformed dimension</td><td>"Did this channel's packager hurt these viewers?"</td><td>Content is in neither cube by design. Intervals plus trace evidence</td></tr>
+      <tr><td class="m">—</td><td>Service minutes never delivered</td><td>"Was the shield quiet, or dead?"</td><td>Empty-minute envelopes and per-agent coverage, reported per cluster</td></tr>
+      <tr><td class="m">—</td><td>Minutes never delivered at all</td><td>"Is the CTV gap a coverage gap or a health signal?"</td><td>Sequence-gap completeness reported per platform tier, never pooled</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- SUMMARY -->
+<section id="summary">
+  <div class="sh"><span class="n">12</span><h2>The whole path, in numbers</h2></div>
+  <div class="tw"><table>
+    <thead><tr><th>Stage</th><th>Zone</th><th>Unit</th><th class="r">Size</th><th class="r">Rate @ 1M concurrent</th><th>Who reads it</th></tr></thead>
+    <tbody>
+      <tr><td class="m">01 player events</td><td><span class="zb dev" style="margin:0">on device</span></td><td>22 events/min</td><td class="r">10,230 B</td><td class="r">333k evt/s</td><td>Nobody, in this design</td></tr>
+      <tr><td class="m">02 SDK memory</td><td><span class="zb dev" style="margin:0">on device</span></td><td>per playback</td><td class="r">~1.4 KB</td><td class="r">resident</td><td>The state machine</td></tr>
+      <tr><td class="m">03 semantic JSON</td><td><span class="zb dev" style="margin:0">on device</span></td><td>1 record/min</td><td class="r">342 B</td><td class="r">16.7k rec/s</td><td>Debug builds only</td></tr>
+      <tr><td class="m">04 packed</td><td><span class="zb dev" style="margin:0">on device</span></td><td>1 record/min</td><td class="r">24 B</td><td class="r">16.7k rec/s</td><td>The wire</td></tr>
+      <tr><td class="m">05 wire, all-in</td><td><span class="zb net" style="margin:0">in transit</span></td><td>per minute</td><td class="r">~78 B</td><td class="r">1.3 MB/s</td><td>Collectors</td></tr>
+      <tr><td class="m">07 raw OLAP</td><td><span class="zb srv" style="margin:0">backend</span></td><td>1 row/min</td><td class="r">7.4 B disk</td><td class="r">10.7 GB/day</td><td>Drill-down, 21-day TTL</td></tr>
+      <tr class="hlr"><td class="m">08 minute cube</td><td><span class="zb srv" style="margin:0">backend</span></td><td>1 row/ctx/min</td><td class="r">~12 B disk</td><td class="r">0.73 GB/day</td><td>Every dashboard and the detector</td></tr>
+      <tr><td class="m">07b interval tier</td><td><span class="zb srv" style="margin:0">backend</span></td><td>~5 rows/viewer-hr</td><td class="r">~11 B disk</td><td class="r">0.4 GB/day</td><td>Watch time, completion, per-title reporting</td></tr>
+      <tr><td class="m">08b quality cube</td><td><span class="zb srv" style="margin:0">backend</span></td><td>1 row/reduced ctx/min</td><td class="r">~140 B</td><td class="r">0.12 GB/day</td><td>Percentiles, bitrate, ladder analysis</td></tr>
+      <tr><td class="m">09 detection</td><td><span class="zb srv" style="margin:0">backend</span></td><td>2 queries/30s</td><td class="r">42k rows scanned</td><td class="r">—</td><td>On-call</td></tr>
+      <tr><td class="m">S1 service spans</td><td><span class="zb svc" style="margin:0">services</span></td><td>per request</td><td class="r">~520 B</td><td class="r">140k spans/s</td><td>The agent, and nobody else unless selected</td></tr>
+      <tr><td class="m">S2–S3 service minute</td><td><span class="zb svc" style="margin:0">services</span></td><td>~75 series/agent/min</td><td class="r">~4 KB/agent</td><td class="r">~23 KB/s</td><td>Ingest</td></tr>
+      <tr class="hlr"><td class="m">S4 service cube</td><td><span class="zb srv" style="margin:0">backend</span></td><td>1 row/key/min</td><td class="r">~40 B disk</td><td class="r">0.28 GB/day</td><td>The aligned view, SRE dashboards, service SLOs</td></tr>
+      <tr><td class="m">S5 aligned join</td><td><span class="zb srv" style="margin:0">backend</span></td><td>per sealed window</td><td class="r">cohort × edge rows</td><td class="r">—</td><td>The alert, as corroboration</td></tr>
+      <tr class="hlr"><td class="m">A analytics archive</td><td><span class="zb srv" style="margin:0">object storage</span></td><td>Parquet, hourly</td><td class="r">~8 B/row</td><td class="r">~13 GB/day</td><td>Analysts and the analytics agent, in DuckDB</td></tr>
+      <tr><td class="m">10 forensics</td><td><span class="zb both" style="margin:0">both</span></td><td>sampled sessions</td><td class="r">~48 KB/session + span flushes</td><td class="r">budget-capped</td><td>Investigation only</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note win" style="margin-top:1rem"><span class="tg">The one sentence</span><p>Measure exactly on the device and at every service node, reduce semantically at the same minute boundary, aggregate both to bounded cubes at write time, detect against mix-aware baselines on what viewers experienced, corroborate against what the services were doing in the same minute, rank by absolute impact, and go get the raw evidence — player timelines and traces — only for the cohort that matters — then let anyone, or any agent, question the history on a laptop without touching the system that pages people.</p></div>
+</section>
+
+</main>
+</div>
+
+<div id="gpanel" role="dialog" aria-live="polite" aria-label="Term explanation">
+  <button class="gx" aria-label="Close explanation">&times;</button>
+  <p class="gt" id="gpanel-t"></p>
+  <p class="gd" id="gpanel-d"></p>
+</div>
+
+<footer><div class="wrap">Streaming Experience Observability · end-to-end data flow · companion to architecture specification v7, with a proposed services lane (S1–S5) extending the same minute discipline to backend OpenTelemetry, and an analytics path (A) that serves ad-hoc questions from Parquet in DuckDB. All figures traced to the worked example; treat rates and cardinalities as planning assumptions until measured in shadow mode.</div></footer>
+
+<script>
+
+var GLOSSARY = {
+ opportunity:["opportunity seconds","The KPI-level name for intent seconds \u2014 the same measurement seen from the other end. The SDK records what the viewer was trying to watch; the KPI layer calls it the viewing opportunity that was either honoured or impacted. Issue-Free Opportunity % is the share of those seconds that came from clean minutes."],
+ issuefree:["Issue-Free Opportunity %","The headline population KPI: eligible opportunity seconds from clean minutes, divided by total eligible opportunity seconds. Always published alongside Impacted Opportunity Seconds, because a rate alone understates severity when heavy buffering inflates the denominator."],
+ intent:["intent seconds","Time the viewer was <em>trying</em> to watch: playing, starting up, or stuck buffering. Using this as the denominator instead of successful playback is what makes a catastrophic stall visible rather than quietly deleting it from the measurement."],
+ eligible:["eligible minute","Whether a minute counts toward the KPI at all. Paused and stopped time is excluded. A minute with almost no playback but an observed failure is explicitly included, so the worst minutes cannot fall out of the denominator."],
+ statemachine:["state machine","A small piece of logic that always knows which state playback is in (starting, playing, buffering, paused, seeking) and how long it has been there. Every duration measured comes from transitions between those states, timed on the device at full resolution."],
+ bitmap:["issue bitmap","One byte where each of the 8 bits is a yes/no flag. Bit 1 set means \u201cthis minute had a rebuffer\u201d, bit 3 means \u201ca playback error\u201d, and so on. Eight facts for the price of one byte."],
+ ctxkey:["context key","A single number standing in for a whole combination \u2014 this device, OS, app version, protocol, CDN, ISP, region. Sent once as a definition, referenced by a 1-byte index everywhere after. It is what keeps each record tiny and the cube narrow."],
+ seq:["sequence number","Each minute record is numbered in order for its playback. A gap in the numbering is how the backend knows a record went missing, rather than assuming the viewer was fine. This is the whole basis of the completeness metric."],
+ varint:["varint","Variable-length integer. Small numbers cost one byte and large ones cost more, instead of every number costing a fixed 4 or 8 bytes whether it needs them or not."],
+ bucket:["log-scale bucket","Instead of storing 13,040 ms exactly, store \u201csomewhere between 12.8 and 16.4 seconds\u201d. Costs one byte, and still allows re-thresholding later \u2014 just never finer than the bucket width. A plain yes/no flag would allow none at all."],
+ zstd:["zstd","Zstandard, a general-purpose compression algorithm. It works by finding repeated patterns, so it does well on a large batch with lots of repetition and poorly on one small record where there is nothing to repeat. That asymmetry is why upload cadence changes the cost per minute so much."],
+ http2:["HTTP/2 multiplexing","Many requests share one already-open connection, so you avoid the cost of opening a new one every minute. It removes most per-request cost, but not all of it \u2014 what remains is framing."],
+ framing:["framing","The fixed bookkeeping bytes every HTTP request carries: headers, lengths, stream identifiers. You pay them whether your payload is 24 bytes or 24 kilobytes, which is why tiny frequent uploads are proportionally expensive."],
+ dedupe:["deduplication key","A value uniquely identifying a record, so if the client sends the same one twice the server recognises it and keeps one copy. It lets clients retry aggressively on bad networks without inflating the numbers."],
+ olap:["OLAP","A database built for scanning and aggregating enormous numbers of rows to answer analytical questions, rather than for reading or updating one row at a time like the database behind an app."],
+ mergetree:["MergeTree","The ClickHouse table type used here. Rows arrive in sorted batches that are merged in the background. Because storage is physically sorted, the sort order you pick determines both how well data compresses and how fast queries run."],
+ codec:["column codec","Per-column compression. A column holds one kind of value, so it compresses far better than a mixed row. Delta stores the difference between neighbouring values, T64 packs small integers tightly, and ZSTD does general compression on top of either."],
+ sortkey:["sort key","The physical order rows are stored in. Sorting by context before playback puts thousands of identical context values next to each other, which compresses to almost nothing and turns a cohort query into a range read instead of a full table scan."],
+ ttl:["TTL","Time-to-live. Rows older than this are deleted automatically. Here it is both the cost control on the raw tier and the mechanism by which identifiers stop existing after 21 days."],
+ mv:["materialized view","A query that runs automatically as data arrives and writes its results into another table. The aggregation happens once at write time instead of being recomputed every time someone opens a dashboard."],
+ aggmt:["AggregatingMergeTree","A table that keeps running totals. When two rows for the same minute and context arrive, it merges them by summing, so the cube stays exactly one row per context per minute no matter how many viewers contributed."],
+ cardinality:["cardinality","How many distinct values something has. Low cardinality (a dozen device types) compresses well and groups fast. High cardinality (a million content ids) does neither \u2014 which is why content id is deliberately kept out of the context tuple."],
+ sketch:["distinct-count sketch","A compact structure that estimates \u201chow many unique viewers\u201d without storing the list of them. A few kilobytes instead of millions of identifiers, accurate to a fraction of a percent, and structurally incapable of identifying anyone."],
+ baseline:["seasonal baseline","What this cohort's issue rate normally is at this time of week, on this platform, in this region, under these conditions. Comparing against a flat average instead would flag every weekday evening as an incident."],
+ pooling:["partial pooling","When a small cohort has too little traffic to form a reliable expectation of its own, borrow from its parent group rather than trusting a handful of noisy minutes. It is what stops tiny cohorts generating constant false alarms."],
+ mixshift:["mix shift","The overall number moved because the population changed, not because anyone's experience got worse. More viewers arriving on a weaker device type drags the average down with no individual viewer degrading at all."],
+ sealed:["sealed window","Once a time window has been evaluated for alerting it is never recalculated, even if data arrives late. It stops the number in the postmortem from disagreeing with the number the on-call engineer saw during the incident."],
+ p95:["p95","The value 95% of cases come in under. \u201Cp95 under five minutes\u201D means at most 1 in 20 incidents takes longer than five minutes to alert \u2014 a far more useful promise than an average, which a few very fast cases can flatter."],
+ excess:["excess impact","Observed issue rate minus the rate you would normally expect, multiplied by how much viewing that cohort actually carries. It converts a percentage into an amount of damage, which is what makes cohorts of very different sizes comparable."],
+ predicate:["cohort predicate","A rule describing which viewers to collect extra evidence from \u2014 for example \u201cCDN is edge-b and app version is 7.2.0\u201d. Because it is written over dimensions only the server knows, only the server can evaluate it."],
+ b_ts:["timestamp \u00b7 2 bytes","Which minute this record is for, stored as a small offset from the batch's base time rather than a full date. Two bytes instead of eight."],
+ b_sq:["sequence \u00b7 1 byte","This record's position in its playback's numbering, as an offset. A missing number later tells the backend a record was lost rather than that nothing happened."],
+ b_act:["active seconds \u00b7 1 byte","Of the 60 seconds the viewer spent trying to watch, how many actually rendered video. 47 in this example. The gap between this and intent seconds is the damage."],
+ b_ad:["ad seconds and flags \u00b7 3 bytes","Ad viewing time and ad issue flags, kept in their own fields rather than mixed with content. Without the separation, an ad-server failure would be reported as a content quality problem."],
+ b_rbc:["rebuffer count \u00b7 1 byte","How many separate times playback stalled in this minute. Three here. Count and duration are separate because three short stalls and one long one feel very different to a viewer."],
+ b_frz:["freeze duration \u00b7 1 byte","Time the picture stopped moving without the player reporting a buffering event. A distinct failure from rebuffering, and detected differently on every platform."],
+ b_sta:["startup duration \u00b7 1 byte","How long from pressing play to the first frame, when that happened inside this minute. Zero here, because this viewer started three minutes earlier."],
+ b_err:["error code \u00b7 1 byte","Which semantic failure occurred, if any \u2014 playback error, DRM error, ad error. The platform's own error string stays on the device; only the category travels."],
+ b_qlt:["quality state \u00b7 1 byte","Whether the picture stayed materially below the best quality available for a sustained period. A single quality change never sets this; it is about a state persisting."],
+ b_br:["bitrate bucket \u00b7 1 byte","The time-weighted average bitrate delivered across this minute's playing seconds, as a log-scale bucket. One byte instead of four \u2014 and, more importantly, buckets can be added together across millions of viewers, which exact values cannot."],
+ b_pk:["peak-rendition seconds \u00b7 1 byte","How many of the minute's seconds ran at the best quality this device and this content ladder could offer. A viewer flipping between 5800 and 1600 kbps averages to a number nobody actually saw, so share of time at the top rung is the more useful figure for encoding decisions."],
+ additive:["additive","A value you can merge by adding. Bucket counts are additive \u2014 two rows of \u201cseconds in each bucket\u201d combine into one by summing. Exact durations are not, because you cannot average two averages and get the right answer. That is why the compact form is also the more capable one."],
+ stalltimeout:["STALL_TIMEOUT","Continuous buffering past a threshold (default 30s) is reclassified: it stops being a rebuffer and becomes a stall-out, and the viewer stops accruing viewing time. Nobody sits through a minute of spinning, so counting it as a recoverable interruption distorts every rebuffer statistic."],
+ ruleset:["classification ruleset","The rules deciding which observed condition sets which issue flag, shipped as data rather than code. The SDK contains a fixed evaluator and a fixed vocabulary of things it can observe; what it concludes from them can be changed from the backend without an app release \u2014 which matters because a large share of TV devices update slowly or never. Every record carries the ruleset version, so a rule change creates a visible boundary in the metric series rather than a silent one."],
+ stagger:["upload stagger","Records are sealed on the wall-clock minute boundary but uploaded at a per-device offset within the following minute, derived from a hash of the playback id. Without it every device transmits at :00 and the collectors see a million requests in a burst, then idle. The offset must never come from anything cohort-related \u2014 hash the ISP and one provider's viewers all upload together, so a collector hiccup in that slot looks exactly like an ISP incident."],
+ watchtime:["watch time","Rendered playback time per title, summed from interval records. Deliberately different from the QoE denominator, which measures attempted viewing including buffering and applies eligibility rules. Two numbers, two published definitions."],
+ b_cfl:["context-change flags \u00b7 1 byte","Operational events such as a CDN failover. Deliberately outside the issue bitmap, so that a routine failover can never be read as a quality incident by anyone computing \u201cany flag set\u201d."],
+ otelagent:["OTel agent","An OpenTelemetry Collector running beside the service on every node, receiving that node\u2019s spans before anything leaves the machine. Here it carries a minute summariser, the backend counterpart of the player SDK\u2019s minute compiler."],
+ opamp:["OpAMP","Open Agent Management Protocol: OpenTelemetry\u2019s channel for pushing configuration to collectors and receiving their status. It plays the role for agents that the upload ACK plays for players \u2014 rulesets, threshold profiles and forensic directives travel down it."],
+ cmcd:["CMCD","Common Media Client Data: a standard way for a player to attach small facts to its media requests, such as a session id, buffer length and requested bitrate. A per-playback session token on each request is what lets a player\u2019s forensic timeline be matched to the exact server-side requests that served it."],
+ conformed:["conformed dimension","One dimension table, with one owner, used by both lanes. The client\u2019s resolved CDN edge and the service\u2019s requesting edge both map into the same keys, so the two cubes can be joined. Two tables that merely look alike join to nothing and read as health."],
+ deltatemp:["delta temporality","Each data point reports only what happened in its own interval \u2014 here, exactly one UTC minute \u2014 rather than a running total since process start. Delta points are directly additive, which is what the cube needs."],
+ ladder:["shared bucket ladder","One log scale, ratio 1.28, anchored so that client rebuffer bucket 11 is 12.8\u201316.4 s. Every histogram on either side is a contiguous window of it: players use 16 rungs for rebuffers, services use 40 rungs from 1.08 ms to 21 s. Where the windows overlap, a bucket means the same interval on both sides."],
+ spanbuffer:["span buffer","A rolling window of recent critical-path spans kept on the node and never sent by default. When a forensic directive arrives, the matching spans are flushed \u2014 including the ones from before anyone knew there was an incident."],
+ headsampling:["head sampling","Deciding at the start of a trace whether to record it. Cheap, but anything summarised afterwards only saw the sampled share. Summaries must be computed before any sampling, or carry the sampling-adjusted counts."],
+ b_res:["reserved \u00b7 3 bytes","Deliberately unused. They exist so a field can be added later without breaking millions of televisions that will never receive another software update."]
+};
+(function(){
+  var panel=document.getElementById("gpanel"),
+      pt=document.getElementById("gpanel-t"), pd=document.getElementById("gpanel-d");
+  if(!panel) return;
+  function show(k){
+    var e=GLOSSARY[k]; if(!e) return;
+    pt.textContent=e[0]; pd.innerHTML=e[1]; panel.classList.add("on");
+  }
+  function hide(){ panel.classList.remove("on"); }
+  document.addEventListener("click", function(ev){
+    var t=ev.target.closest("[data-k]");
+    if(t){ ev.preventDefault(); show(t.getAttribute("data-k")); return; }
+    if(ev.target.closest(".gx") || !ev.target.closest("#gpanel")) hide();
+  });
+  document.addEventListener("keydown", function(ev){ if(ev.key==="Escape") hide(); });
+  if(window.matchMedia && window.matchMedia("(pointer:fine)").matches){
+    document.addEventListener("mouseover", function(ev){
+      var t=ev.target.closest("[data-k]"); if(t) show(t.getAttribute("data-k"));
+    });
+  }
+})();
+
+(function(){
+  var spec = [
+    {n:2, c:"var(--blue)",   t:"ts",  k:"b_ts"},
+    {n:1, c:"var(--blue)",   t:"sq",  k:"b_sq"},
+    {n:1, c:"var(--accent)", t:"ctx", k:"ctxkey"},
+    {n:1, c:"var(--good)",   t:"int", k:"intent"},
+    {n:1, c:"var(--good)",   t:"act", k:"b_act"},
+    {n:1, c:"var(--good)",   t:"iss", k:"bitmap"},
+    {n:1, c:"var(--warn)",   t:"int", k:"b_ad"},
+    {n:1, c:"var(--warn)",   t:"act", k:"b_ad"},
+    {n:1, c:"var(--warn)",   t:"iss", k:"b_ad"},
+    {n:1, c:"var(--bad)",    t:"rbc", k:"b_rbc"},
+    {n:1, c:"var(--bad)",    t:"rbm", k:"bucket"},
+    {n:1, c:"var(--bad)",    t:"frz", k:"b_frz"},
+    {n:1, c:"var(--bad)",    t:"sta", k:"b_sta"},
+    {n:1, c:"var(--bad)",    t:"err", k:"b_err"},
+    {n:1, c:"var(--bad)",    t:"adc", k:"b_ad"},
+    {n:1, c:"var(--bad)",    t:"adm", k:"b_ad"},
+    {n:1, c:"var(--bad)",    t:"qlt", k:"b_qlt"},
+    {n:1, c:"var(--violet)", t:"cfl", k:"b_cfl"},
+    {n:1, c:"var(--blue)",   t:"br",  k:"b_br"},
+    {n:1, c:"var(--blue)",   t:"pk",  k:"b_pk"},
+    {n:3, c:"var(--ink-3)",  t:"·", k:"b_res"}
+  ];
+  var host = document.getElementById("bytemap");
+  if(!host) return;
+  spec.forEach(function(g){
+    for(var i=0;i<g.n;i++){
+      var d = document.createElement("button");
+      d.className = "byte";
+      d.type = "button";
+      d.style.background = g.c;
+      d.textContent = g.t;
+      if(g.k) d.setAttribute("data-k", g.k);
+      host.appendChild(d);
+    }
+  });
+})();
+</script>
+</body>
+</html>

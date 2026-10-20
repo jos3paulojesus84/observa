@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Streaming Experience Observability — Architecture Specification v7</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16202B; --ink-2:#4A5A6A; --ink-3:#78868F;
+  --paper:#F3F6F7; --surface:#FFFFFF; --surface-2:#EBF0F2;
+  --line:#DBE3E7; --line-2:#C0CBD2;
+  --accent:#0E7C86; --accent-soft:#D9EDEF;
+  --good:#3B8A6B; --bad:#BF4E3E; --warn:#A87526;
+  --good-soft:#DCEDE4; --bad-soft:#F6E0DB; --warn-soft:#F3E8D2;
+  --code-bg:#EAEFF2;
+  --hero-bg:#0F1A24; --hero-ink:#E6EDF2; --hero-ink-2:#8FA3B2; --hero-line:#25333F;
+  --cell-good:#2F6F57; --cell-bad:#B8462F; --cell-empty:#1B2833;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#DEE5EA; --ink-2:#9BABB8; --ink-3:#71818E;
+    --paper:#0C141C; --surface:#141F29; --surface-2:#1A2733;
+    --line:#26333F; --line-2:#364654;
+    --accent:#45B4BD; --accent-soft:#12333A;
+    --good:#61B892; --bad:#E27C68; --warn:#D2A356;
+    --good-soft:#142D24; --bad-soft:#331A16; --warn-soft:#332714;
+    --code-bg:#1B2733;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#DEE5EA; --ink-2:#9BABB8; --ink-3:#71818E;
+  --paper:#0C141C; --surface:#141F29; --surface-2:#1A2733;
+  --line:#26333F; --line-2:#364654;
+  --accent:#45B4BD; --accent-soft:#12333A;
+  --good:#61B892; --bad:#E27C68; --warn:#D2A356;
+  --good-soft:#142D24; --bad-soft:#331A16; --warn-soft:#332714;
+  --code-bg:#1B2733;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:16.5px; line-height:1.62; font-weight:400;
+  -webkit-font-smoothing:antialiased;
+}
+code,kbd,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* ---------- hero ---------- */
+.hero{background:var(--hero-bg); color:var(--hero-ink); padding:clamp(2.5rem,6vw,5rem) 0 clamp(2rem,4vw,3.5rem)}
+.hero-inner{max-width:1180px; margin:0 auto; padding:0 clamp(1.1rem,4vw,2.5rem)}
+.status{
+  display:inline-flex; gap:.55rem; align-items:center; font-size:.78rem; letter-spacing:.01em;
+  color:var(--hero-ink-2); border:1px solid var(--hero-line); border-radius:2px;
+  padding:.3rem .6rem; margin-bottom:1.6rem;
+}
+.status b{color:var(--hero-ink); font-weight:500}
+h1{
+  font-size:clamp(2.1rem,5.4vw,3.7rem); line-height:1.04; letter-spacing:-.028em;
+  font-weight:600; margin:0 0 .7rem; max-width:19ch;
+}
+.subtitle{font-size:clamp(1rem,2vw,1.2rem); color:var(--hero-ink-2); max-width:58ch; margin:0 0 2.6rem; line-height:1.5}
+.subtitle em{color:var(--hero-ink); font-style:normal}
+
+/* minute grid figure */
+.grid-fig{border-top:1px solid var(--hero-line); padding-top:1.7rem}
+.grid-wrap{overflow-x:auto; padding-bottom:.4rem}
+.mgrid{display:grid; gap:2px; min-width:520px; width:100%}
+.mrow{display:grid; grid-template-columns:5.6rem repeat(24,1fr); gap:2px; align-items:center}
+.rlabel{font-size:.72rem; color:var(--hero-ink-2); font-family:"IBM Plex Mono",monospace; white-space:nowrap}
+.cell{aspect-ratio:1/1; border-radius:1px; background:var(--cell-empty)}
+.cell.g{background:var(--cell-good)}
+.cell.b{background:var(--cell-bad)}
+.axis{display:grid; grid-template-columns:5.6rem repeat(24,1fr); gap:2px; margin-top:.5rem}
+.axis span{font-size:.62rem; color:var(--hero-ink-2); font-family:"IBM Plex Mono",monospace; text-align:center}
+.axis span:first-child{text-align:left}
+.legend{display:flex; flex-wrap:wrap; gap:1.2rem; margin-top:1.4rem; font-size:.8rem; color:var(--hero-ink-2)}
+.legend i{display:inline-block; width:.68rem; height:.68rem; border-radius:1px; margin-right:.42rem; vertical-align:-1px}
+.caption{margin-top:1.15rem; font-size:.88rem; color:var(--hero-ink-2); max-width:70ch; line-height:1.55}
+.caption b{color:var(--hero-ink); font-weight:500}
+
+@media (prefers-reduced-motion:no-preference){
+  .cell{opacity:0; animation:pop .38s ease forwards}
+  .mrow:nth-child(1) .cell{animation-delay:.05s}
+  .mrow:nth-child(2) .cell{animation-delay:.13s}
+  .mrow:nth-child(3) .cell{animation-delay:.21s}
+  .mrow:nth-child(4) .cell{animation-delay:.29s}
+  .mrow:nth-child(5) .cell{animation-delay:.37s}
+  .mrow:nth-child(6) .cell{animation-delay:.45s}
+  .cell.b{animation:pop .38s ease forwards, flare 1.1s ease .75s 1}
+}
+@keyframes pop{to{opacity:1}}
+@keyframes flare{0%{filter:none}35%{filter:brightness(1.55)}100%{filter:none}}
+
+/* ---------- layout ---------- */
+.shell{max-width:1180px; margin:0 auto; padding:0 clamp(1.1rem,4vw,2.5rem); display:grid; gap:clamp(2rem,4vw,3.5rem)}
+@media (min-width:1020px){ .shell{grid-template-columns:15rem minmax(0,1fr)} }
+
+nav.toc{padding:2.5rem 0 1rem}
+@media (min-width:1020px){
+  nav.toc{position:sticky; top:0; align-self:start; max-height:100vh; overflow-y:auto; padding:3rem 1rem 3rem 0}
+}
+.toc-head{font-size:.78rem; color:var(--ink-3); margin:0 0 .85rem; font-weight:500}
+.toc ol{list-style:none; margin:0; padding:0; font-size:.86rem; line-height:1.35}
+.toc li{margin:0 0 .1rem}
+.toc a{display:block; padding:.3rem .55rem .3rem .6rem; color:var(--ink-2); text-decoration:none; border-left:2px solid transparent; border-radius:0 2px 2px 0}
+.toc a:hover{color:var(--ink); background:var(--surface-2)}
+.toc a.on{color:var(--accent); border-left-color:var(--accent); background:var(--accent-soft)}
+.toc a .n{font-family:"IBM Plex Mono",monospace; font-size:.76rem; color:var(--ink-3); margin-right:.45rem}
+.toc a.on .n{color:var(--accent)}
+
+main{padding:clamp(1.5rem,4vw,3.2rem) 0 5rem; min-width:0}
+section{margin:0 0 clamp(2.8rem,5vw,4.2rem); scroll-margin-top:1.5rem}
+h2{
+  font-size:clamp(1.35rem,2.6vw,1.72rem); line-height:1.2; letter-spacing:-.018em; font-weight:600;
+  margin:0 0 1.1rem; padding-bottom:.6rem; border-bottom:1px solid var(--line-2);
+  display:flex; gap:.75rem; align-items:baseline;
+}
+h2 .n{font-family:"IBM Plex Mono",monospace; font-size:.82em; color:var(--accent); font-weight:500; flex:none}
+h3{font-size:1.02rem; font-weight:600; letter-spacing:-.005em; margin:2rem 0 .6rem; color:var(--ink)}
+h3 .n{font-family:"IBM Plex Mono",monospace; color:var(--ink-3); font-weight:500; margin-right:.5rem; font-size:.92em}
+p{margin:0 0 1rem; max-width:74ch}
+ul,ol{margin:0 0 1rem; padding-left:1.25rem; max-width:74ch}
+li{margin:0 0 .4rem}
+a{color:var(--accent)}
+strong{font-weight:600}
+code{background:var(--code-bg); padding:.1em .35em; border-radius:2px; font-size:.87em; color:var(--ink)}
+hr{border:0; border-top:1px solid var(--line); margin:2.5rem 0}
+
+/* tables */
+.tw{overflow-x:auto; margin:0 0 1.3rem; border:1px solid var(--line); border-radius:3px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:.9rem; min-width:34rem}
+th,td{text-align:left; padding:.62rem .8rem; border-bottom:1px solid var(--line); vertical-align:top}
+thead th{background:var(--surface-2); font-weight:600; font-size:.82rem; color:var(--ink-2); white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+td code{background:transparent; padding:0; color:var(--accent); font-size:.86em}
+table.fields td:first-child{white-space:nowrap; font-family:"IBM Plex Mono",monospace; font-size:.83rem; color:var(--accent)}
+.num{font-family:"IBM Plex Mono",monospace; font-size:.86rem; white-space:nowrap}
+
+/* callouts */
+.note{border-left:3px solid var(--line-2); background:var(--surface); padding:.85rem 1.05rem; margin:0 0 1.3rem; border-radius:0 3px 3px 0; max-width:76ch}
+.note p:last-child{margin-bottom:0}
+.note .tag{display:block; font-size:.76rem; font-weight:600; margin-bottom:.3rem; color:var(--ink-3)}
+.note.rule{border-left-color:var(--accent); background:var(--accent-soft)}
+.note.rule .tag{color:var(--accent)}
+.note.limit{border-left-color:var(--bad); background:var(--bad-soft)}
+.note.limit .tag{color:var(--bad)}
+.note.open{border-left-color:var(--warn); background:var(--warn-soft)}
+.note.open .tag{color:var(--warn)}
+
+/* flow diagram */
+.flow{background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:1.1rem 1.2rem; overflow-x:auto; margin:0 0 1.3rem}
+.flow pre{margin:0; font-family:"IBM Plex Mono",monospace; font-size:.8rem; line-height:1.62; color:var(--ink-2); white-space:pre}
+.flow b{color:var(--ink); font-weight:500}
+
+/* budget bar */
+.budget{list-style:none; padding:0; margin:0 0 1.2rem; max-width:44rem}
+.budget li{display:grid; grid-template-columns:minmax(9rem,13rem) 1fr auto; gap:.8rem; align-items:center; margin-bottom:.42rem; font-size:.87rem}
+.budget .bar{height:.72rem; background:var(--accent); border-radius:1px; min-width:2px}
+.budget .bar.conf{background:var(--warn)}
+.budget .v{font-family:"IBM Plex Mono",monospace; font-size:.8rem; color:var(--ink-2)}
+.budget .tot{border-top:1px solid var(--line); padding-top:.5rem; margin-top:.5rem; font-weight:600}
+
+footer{border-top:1px solid var(--line); padding:2rem 0 4rem; color:var(--ink-3); font-size:.85rem}
+footer .shell{display:block}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="status"><b>Version 7</b> · Integrated specification · Supersedes v1–v6</div>
+    <h1>Streaming Experience Observability</h1>
+    <p class="subtitle">A population-scale quality-of-experience system that measures playback where the truth is, aggregates where the scale is, and retrieves raw evidence only where it is needed — and lines viewer impact up, minute for minute, with what the services behind it were doing. <em>This document is the implementation contract.</em></p>
+
+    <figure class="grid-fig">
+      <div class="grid-wrap">
+        <div class="mgrid" id="mgrid"></div>
+        <div class="axis" id="axis"></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--cell-good)"></i>Issue-free minute</span>
+        <span><i style="background:var(--cell-bad)"></i>Impacted minute</span>
+        <span><i style="background:var(--cell-empty)"></i>Not watching</span>
+      </div>
+      <figcaption class="caption">Each viewer's playback collapses to one observation per wall-clock minute. <b>A synchronized block of impacted minutes across unrelated viewers is a population incident.</b> Scattered single red minutes are the ordinary background rate of the internet. Detecting the difference is the entire job of the backend, and it needs neither raw playback events nor server-side session reconstruction to do it.</figcaption>
+    </figure>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <p class="toc-head">Contents</p>
+    <ol id="toc"></ol>
+  </nav>
+
+  <main>
+
+  <section id="s0">
+    <h2><span class="n">0</span> Summary</h2>
+    <p>Event-centric quality-of-experience analytics reconstruct each viewing session on the server from a stream of raw player events. That model scales with events per session, which is the wrong quantity: it is large, it varies by platform and player version, and almost none of it is read.</p>
+    <p>This architecture scales the hot path with viewing minutes instead. The player SDK runs a deterministic state machine, measures exact timings locally, and compiles them into three small semantic records. The backend aggregates those records into a bounded cube, detects population change against mix-aware baselines, and attributes impact to cohorts. Raw session timelines are sampled continuously at a low rate and captured at higher rate on demand, as evidence rather than as the analytical substrate.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Primitive</th><th>Answers</th><th>Cardinality</th></tr></thead>
+      <tbody>
+        <tr><td><code>PlaybackAttempt</code></td><td>Did playback start, fail, retry, or get abandoned, and how long did it take?</td><td>One or two per playback</td></tr>
+        <tr><td><code>ExperienceMinute</code></td><td>Was this minute of playback opportunity healthy, and what degraded it?</td><td>One per playback per wall-clock minute</td></tr>
+        <tr><td><code>PlaybackInterval</code></td><td>What was playing, for exactly how long, in which operational context?</td><td>One per asset / ad / program boundary</td></tr>
+      </tbody>
+    </table></div>
+    <p>Two supporting records carry state that would otherwise be repeated on every row: <code>ContextDefinition</code> (§5) and <code>ForensicPolicy</code> (§11).</p>
+    <p><strong>v7 adds a second instrument and a second read path.</strong> The <strong>services lane</strong> (§12) applies the same discipline to backend OpenTelemetry: an agent on every critical-path node compiles spans into a <code>ServiceMinute</code> on the same UTC minute, over the same conformed edge and region dimensions, so viewer impact and service behaviour line up by coordinates rather than by people comparing two products in an incident channel. The <strong>analytics archive</strong> (§8.9) lands the per-playback tiers as Parquet on object storage, where any subset can be loaded into a local DuckDB and questioned by an analyst or an analytics agent — leaving ClickHouse sized for monitoring and troubleshooting alone.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Question</th><th>Answered by</th><th>Read path</th></tr></thead>
+      <tbody>
+        <tr><td>How many viewers, how badly?</td><td>Impacted Opportunity Seconds and distinct impacted playbacks, content and ads separately (§4)</td><td>Minute cube</td></tr>
+        <tr><td>Where?</td><td>Impact-ranked cohort attribution over client-observable and server-derived dimensions (§10)</td><td>Minute cube</td></tr>
+        <tr><td>What?</td><td>Issue bits and counters — rebuffer, stall-out, startup, error, DRM, ad, quality (§6.2)</td><td>Minute and quality cubes</td></tr>
+        <tr><td>Why?</td><td>Which service path moved with the impacted cohort, in the same minute, and which moved first (§12.5)</td><td>Service cube, aligned view</td></tr>
+        <tr><td>Show me</td><td>Player timelines and traces, for the selected cohort only (§11, §12.6)</td><td>Forensic tier</td></tr>
+        <tr><td>Everything else, and history</td><td>Any subset of minutes, attempts, intervals and service minutes, loaded on demand (§8.9)</td><td>Parquet archive → DuckDB</td></tr>
+      </tbody>
+    </table></div>
+    <p>Both instruments ship summaries rather than events, and raw data leaves a device or a node only when it is selected as evidence. That is what makes it affordable to keep the viewer side and the service side in one system rather than buying them separately and joining them by hand (§17.5).</p>
+  </section>
+
+  <section id="s1">
+    <h2><span class="n">1</span> Positioning</h2>
+    <p>This is not a general replacement for streaming analytics. It is a specific claim about which layer should be universal and which should be sampled.</p>
+    <h3><span class="n">1.1</span> What this does differently</h3>
+    <ul>
+      <li><strong>Cost scales with watch time, not player chattiness.</strong> Hot-path volume is a function of concurrent viewers, and is unaffected by a player release that doubles its event rate.</li>
+      <li><strong>Attribution ranks by impact, not by rate.</strong> The worst-performing cohort is usually small and irrelevant. The system reports the cohort explaining the most excess degradation, with traffic share attached.</li>
+      <li><strong>The measurement contract is explicit and versioned.</strong> Eligibility, taxonomy, and thresholds are named policies carried on every record, so a KPI series cannot silently change meaning underneath a dashboard.</li>
+      <li><strong>Dashboards never depend on raw retrieval.</strong> The forensic store can be slow, cheap, and small without affecting operational monitoring.</li>
+    </ul>
+    <ul>
+      <li><strong>Viewer impact and service behaviour on one clock.</strong> Players and critical-path service nodes both reduce to wall-clock minutes over the same conformed dimensions, so "who was hurt, where, by what, how many" and "what our services were doing at that moment" are one join, not two products and a war room (§12).</li>
+      <li><strong>Exploration runs off the monitoring cluster.</strong> Ad-hoc and historical analysis reads a Parquet archive in DuckDB, so it costs object storage and a laptop rather than ClickHouse capacity sized for peak curiosity (§8.9).</li>
+    </ul>
+    <h3><span class="n">1.2</span> What established vendors do better</h3>
+    <p>An honest comparison, because reviewers will ask and because these gaps are real.</p>
+    <ul>
+      <li>Full session-level forensics on every session, out of the box, with no sampling decision to get wrong.</li>
+      <li>Cross-publisher benchmarking, which requires a customer base this system does not have.</li>
+      <li>A mature integration surface: player plugins across dozens of SDK versions, ad-verification ecosystems, CDN and encoder correlation.</li>
+      <li>Full-fidelity distributed tracing across every service. APM products trace everything; the services lane summarises only the critical delivery path and keeps raw spans as evidence.</li>
+      <li>Arbitrary retrospective re-analysis. Once a threshold is applied on-device, history cannot be recomputed against a different threshold (§13.3).</li>
+    </ul>
+    <h3><span class="n">1.3</span> Out of scope</h3>
+    <p>This system does not replace player debug logs, CDN access logs, ad verification, encoder monitoring, general-purpose APM, or business analytics. The services lane (§12) summarises the critical delivery path — origin shield, packager, license, entitlement, ad decisioning — for correlation with viewer impact; it is not a tracing product for every service, and engineers still debug code in their APM. It correlates with these systems; it does not subsume them.</p>
+  </section>
+
+  <section id="s2">
+    <h2><span class="n">2</span> Goals and non-goals</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Goal</th><th>Mechanism</th></tr></thead>
+      <tbody>
+        <tr><td>Universal coverage at bounded cost</td><td>Compact semantic records, client-local context IDs, batching, bounded raw sampling</td></tr>
+        <tr><td>Detection within minutes</td><td>Pre-aggregated cube; an explicit latency budget that sums to the SLO (§8.7)</td></tr>
+        <tr><td>Accurate timing</td><td>Exact local measurement precedes semantic reduction; intervals preserve durations</td></tr>
+        <tr><td>Explainable incidents</td><td>Mix-shift separation, baseline-adjusted excess impact, guarded cohort drill-down</td></tr>
+        <tr><td>Trustworthy numbers</td><td>Sequence-gap completeness, versioned policies, sealed alerting windows</td></tr>
+        <tr><td>Portability</td><td>One semantic taxonomy across Web, iOS, Android, CTV, console</td></tr>
+        <tr><td>Explain why, not only where</td><td>ServiceMinute on the same UTC minute and conformed dimensions; the aligned view attached to every alert (§12)</td></tr>
+        <tr><td>Cheap ad-hoc and historical analysis</td><td>Parquet archive on object storage, subsets loaded into a local DuckDB; no exploratory load on the monitoring cluster (§8.9)</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Non-goals.</strong> The SDK does not detect anomalies, does not infer root cause, does not evaluate cohort predicates, and does not transmit raw player events by default. All population intelligence is server-side. All server-derived dimensions are resolved server-side and never sent down to clients. The services lane does not change this: it reports which service path moved with an impacted cohort and in what order, never that it caused the impact.</p>
+  </section>
+
+  <section id="s3">
+    <h2><span class="n">3</span> Measurement model</h2>
+
+    <h3><span class="n">3.1</span> Why three primitives</h3>
+    <p>A minute abstraction alone cannot represent a session that never produced a minute, and it cannot answer how many seconds of a specific ad were watched. Rather than distort the minute to cover both, acquisition and consumption get their own records. Each primitive has one job and a stable key.</p>
+
+    <h3><span class="n">3.2</span> Identity and boundaries</h3>
+    <p>Three identifiers, deliberately separate. Getting this wrong is the most expensive schema mistake available, because multiview and picture-in-picture put two concurrent players inside one session.</p>
+    <div class="tw"><table class="fields">
+      <thead><tr><th>Identifier</th><th>Scope</th><th>Ends when</th></tr></thead>
+      <tbody>
+        <tr><td>device_id</td><td>Pseudonymous, rotating, hot tier only. Used to bound targeting and detect repeat-offender devices.</td><td>Rotation policy interval, or app reinstall</td></tr>
+        <tr><td>session_id</td><td>One app viewing session. Groups concurrent and sequential playbacks.</td><td>App termination, or 30 minutes with no playback activity (configurable, versioned)</td></tr>
+        <tr><td>playback_id</td><td><strong>One player instance playing one piece of content.</strong> The key for all three primitives.</td><td>Player destroyed, content completed, or navigation away. Emits a terminal record with a reason.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Normative</span><p><code>ExperienceMinute</code> is keyed on <code>(minute_ts, playback_id)</code>, and <code>sequence_no</code> is monotonic per <code>playback_id</code>. Two simultaneous players in one session therefore produce two independent, non-colliding minute streams that share a <code>session_id</code>.</p></div>
+
+    <h3><span class="n">3.3</span> PlaybackAttempt</h3>
+    <div class="tw"><table class="fields">
+      <thead><tr><th>Field</th><th>Contract</th></tr></thead>
+      <tbody>
+        <tr><td>attempt_id</td><td>Logical attempt identifier; also the reconciliation key between provisional and terminal records</td></tr>
+        <tr><td>playback_id</td><td>Player instance this attempt belongs to</td></tr>
+        <tr><td>session_id</td><td>Owning session</td></tr>
+        <tr><td>context_id</td><td>Client-local context reference at initiation</td></tr>
+        <tr><td>initiation_ts</td><td>Written at initiation, before the outcome is known</td></tr>
+        <tr><td>terminal_ts</td><td>Completion or failure time, when observed</td></tr>
+        <tr><td>result</td><td><code>UNKNOWN</code> / <code>STARTED</code> / <code>FAILED</code> / <code>ABANDONED</code></td></tr>
+        <tr><td>failure_type</td><td>Semantic failure category (§6.2), when determinable</td></tr>
+        <tr><td>startup_duration_ms</td><td>Initiation to first rendered frame, inclusive of internal retries. <strong>Stored exact, not bucketed</strong> — attempts occur roughly three times per viewer-hour against sixty minute records, so exact milliseconds are free here and give true percentiles</td></tr>
+        <tr><td>retry_count</td><td>Automatic retries inside this logical attempt</td></tr>
+        <tr><td>attempt_policy_version</td><td>Defines what counts as an attempt and a retry</td></tr>
+      </tbody>
+    </table></div>
+    <div class="tw"><table>
+      <thead><tr><th>Question</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td>What is an attempt?</td><td>A user-visible playback initiation. Autoplay previews and prefetch are excluded unless the product explicitly classifies them as playback attempts.</td></tr>
+        <tr><td>Retries?</td><td>Automatic retries within the player's own retry policy stay inside one logical attempt. Explicit user re-initiation creates a new attempt.</td></tr>
+        <tr><td>Cancelled after one second?</td><td>Counts as initiated; resolves to <code>ABANDONED</code> if no terminal playback state is reached.</td></tr>
+        <tr><td>App killed during startup?</td><td>The provisional record already exists. A bounded timeout converts it to <code>ABANDONED</code> or <code>UNKNOWN</code> by policy; it is never deleted.</td></tr>
+        <tr><td>Denominator?</td><td>All initiated attempts under the policy, including failures and abandonments. Not only attempts that reached playback.</td></tr>
+      </tbody>
+    </table></div>
+    <p><code>retry_count</code> is separate from <code>startup_duration_ms</code> on purpose. A rising retry rate and a rising startup time are different incidents with different owners, and folding retries into the duration hides the first inside the second.</p>
+
+    <h3><span class="n">3.4</span> ExperienceMinute</h3>
+    <div class="tw"><table class="fields">
+      <thead><tr><th>Field</th><th>Contract</th></tr></thead>
+      <tbody>
+        <tr><td>minute_ts</td><td>UTC wall-clock minute bucket, normalized server-side (§7)</td></tr>
+        <tr><td>playback_id</td><td>Player instance</td></tr>
+        <tr><td>session_id</td><td>Owning session; hot tier only</td></tr>
+        <tr><td>context_id</td><td>Client-local context reference</td></tr>
+        <tr><td>sequence_no</td><td>Monotonic per playback_id; the basis of gap detection</td></tr>
+        <tr><td>content_intent_seconds</td><td>Seconds in <code>STARTING</code> + <code>PLAYING</code> + <code>BUFFERING</code> attributable to content</td></tr>
+        <tr><td>content_active_seconds</td><td>Seconds actually rendering content</td></tr>
+        <tr><td>content_issue_bitmap</td><td>Experience-impact flags for the content portion of the minute</td></tr>
+        <tr><td>ad_intent_seconds</td><td>Intent seconds attributable to ads</td></tr>
+        <tr><td>ad_active_seconds</td><td>Seconds actually rendering ads</td></tr>
+        <tr><td>ad_issue_bitmap</td><td>Experience-impact flags for the ad portion of the minute</td></tr>
+        <tr><td>issue_counters</td><td>Small bounded counts and bucketed durations per issue, split by content / ad. Includes a bucketed <code>startup_ms</code> so the cube can compare startup across cohorts without joining to attempts</td></tr>
+        <tr><td>bitrate_bucket</td><td>Log-scale bucket of the time-weighted mean delivered bitrate across the minute's active seconds</td></tr>
+        <tr><td>peak_rendition_seconds</td><td>Seconds spent at the best rendition available for this ladder and device (0–60)</td></tr>
+        <tr><td>context_change_flags</td><td>Operational transitions such as a CDN switch. Never an issue.</td></tr>
+        <tr><td>taxonomy_version</td><td>Semantic taxonomy in force</td></tr>
+        <tr><td>threshold_profile_id</td><td>Threshold profile applied locally</td></tr>
+        <tr><td>eligibility_policy_version</td><td>Eligibility definition applied locally</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Normative — content and ad are scored separately</span><p>The minute carries <strong>two intent budgets and two bitmaps</strong>, not one bitmap and a seconds split. Splitting only the denominator lets you compute a content-only denominator with an ad-contaminated numerator, which produces content incidents every time the ad server degrades. Two bitmaps cost roughly eight bytes and make content QoE and ad QoE independently computable from a single record.</p></div>
+
+    <h3><span class="n">3.5</span> Eligibility</h3>
+    <div class="note rule"><span class="tag">Normative</span><p>A minute is eligible when <code>intent_seconds ≥ min_intent</code> <strong>or</strong> when the minute contains an observed experience issue during playback intent. Paused and stopped time is excluded. The override exists because a viewer who obtained three seconds of video in a minute of continuous rebuffering is having the worst experience the system can measure, and an eligibility floor based on successful playback would delete exactly that minute from the denominator.</p></div>
+    <p>Both <code>intent_seconds</code> and <code>active_seconds</code> are stored so the denominator is auditable after the fact and so a change of policy can be reasoned about rather than guessed at.</p>
+
+    <h3><span class="n">3.6</span> PlaybackInterval</h3>
+    <div class="tw"><table class="fields">
+      <thead><tr><th>Field</th><th>Contract</th></tr></thead>
+      <tbody>
+        <tr><td>playback_id</td><td>Player instance</td></tr>
+        <tr><td>start_ts</td><td>Exact local start, preserved at millisecond resolution</td></tr>
+        <tr><td>duration_ms</td><td>Wall time inside the interval, including buffering and pause</td></tr>
+        <tr><td>active_ms</td><td><strong>Rendered time.</strong> Distinct from <code>duration_ms</code>, and the one that belongs in watch-time reporting</td></tr>
+        <tr><td>asset_id / program_id</td><td>Content identity where available</td></tr>
+        <tr><td>asset_type</td><td><code>CONTENT</code> / <code>LIVE</code> / <code>AD</code> / <code>PROMO</code> / <code>SLATE</code></td></tr>
+        <tr><td>context_id</td><td>Operational context during the interval</td></tr>
+        <tr><td>issue_summary</td><td>Compact impact summary for the interval</td></tr>
+        <tr><td>max_position_pct</td><td>Furthest point reached, as a percentage of asset duration. A viewer who seeks to the credits reads 100%</td></tr>
+        <tr><td>watched_pct</td><td><code>active_ms</code> ÷ asset duration. Diverges from <code>max_position_pct</code>, and product teams care about the difference</td></tr>
+        <tr><td>bitrate_bucket</td><td>Time-weighted mean bitrate for this interval. Duplicated from the minute because minutes know quality but not content, and joining two per-playback tiers costs more than one byte</td></tr>
+        <tr><td>end_reason</td><td><code>COMPLETED</code> / <code>USER_EXIT</code> / <code>ERROR</code> / <code>SWITCHED</code> / <code>SESSION_END</code> / <code>STALL_TIMEOUT</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Intervals are the authoritative accounting layer. Minute records answer "was the experience healthy"; intervals answer "twenty seconds or fifty seconds", which is a billing and rights question rather than a QoE question and should not be forced through a minute bucket. Asset duration lives in an asset dimension table, never on every row.</p>
+    <div class="note limit"><span class="tag">Two watch-time numbers, on purpose</span><p>Interval watch time will not equal summed minute <code>active_seconds</code>. Intervals measure playback; minutes apply eligibility rules and exclude paused time. They measure different things deliberately. Publish one definition of each in the metric layer and state the divergence, because otherwise it gets filed as a bug in month two.</p></div>
+
+    <h3><span class="n">3.7</span> Why buckets, and where they stop</h3>
+    <p>Durations are carried as log-scale bucket indices rather than exact values. The byte saving is secondary. The real property is that <strong>buckets are additive and exact values are not</strong>: a cube row can hold "seconds in bucket 0…15" and two rows merge by summing, whereas exact milliseconds can only yield a percentile through a quantile sketch stored per row, which would run to hundreds of bytes and dwarf a 60-byte cube row.</p>
+    <p>So the comparison is not one byte against four. It is "the cube can answer this" against "every percentile query falls through to the raw tier". The pattern throughout: <strong>the record carries a bucket index, the cube carries counts per bucket, and percentiles come out of the histogram.</strong></p>
+    <div class="tw"><table>
+      <thead><tr><th>Measurement</th><th>Carried on</th><th>Encoding</th><th>Why there</th></tr></thead>
+      <tbody>
+        <tr><td>Rebuffer duration</td><td>ExperienceMinute</td><td>1 B log bucket</td><td>Sixty per viewer-hour; must be cube-mergeable</td></tr>
+        <tr><td>Startup (VST)</td><td>PlaybackAttempt</td><td><strong>Exact, 4 B</strong></td><td>~3 per viewer-hour; exact is affordable and yields true percentiles</td></tr>
+        <tr><td>Startup (VST)</td><td>ExperienceMinute</td><td>1 B log bucket</td><td>Duplicated deliberately, so cohort comparison stays inside the cube</td></tr>
+        <tr><td>Delivered bitrate</td><td>ExperienceMinute</td><td>1 B log bucket</td><td>Time-weighted mean over active seconds</td></tr>
+        <tr><td>Time at peak rendition</td><td>ExperienceMinute</td><td>1 B, 0–60 s</td><td>A mean hides oscillation between ladder rungs; share of time at peak is the actionable number</td></tr>
+        <tr><td>VOD completion</td><td>PlaybackInterval</td><td>1 B integer percent</td><td>~5 per viewer-hour; no bucketing needed</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note limit"><span class="tag">The averaging trap</span><p>Averaging bucket indices, or averaging per-minute averages, is wrong and will look plausible: it weights a one-minute viewer the same as a three-hour one. The cube stores <code>sum(representative_kbps × active_seconds)</code> and <code>sum(active_seconds)</code>, and divides at query time. Bucket midpoints introduce roughly ±4% error on the mean — fine for CDN cost trending, not fine for anything contractual.</p></div>
+  </section>
+
+  <section id="s4">
+    <h2><span class="n">4</span> KPI suite</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Metric</th><th>Definition</th><th>Reads as</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Playback Start Success&nbsp;%</strong></td><td>successful logical attempts ÷ initiated logical attempts</td><td>Acquisition health</td></tr>
+        <tr><td><strong>Issue-Free Opportunity&nbsp;%</strong></td><td>eligible intent seconds from clean minutes ÷ total eligible intent seconds</td><td>Population health of playback opportunity</td></tr>
+        <tr><td><strong>Impacted Opportunity Seconds</strong></td><td>sum of eligible intent seconds in impacted minutes</td><td>Absolute severity, immune to denominator dilution</td></tr>
+        <tr><td><strong>Issue Impact</strong></td><td>baseline-adjusted excess impacted opportunity seconds, by issue and cohort</td><td>Where abnormal degradation is concentrated</td></tr>
+      </tbody>
+    </table></div>
+    <p>Each of these is computed twice, once for content and once for ads, from the two bitmaps in §3.4. A combined view is available; it is never the only view.</p>
+
+    <h3><span class="n">4.1</span> Why intent seconds, and what it costs</h3>
+    <p>Using active playback seconds as the denominator excludes the time a viewer spends unsuccessfully trying to watch, which is the time that matters most. Using intent seconds makes catastrophic buffering visible.</p>
+    <p>The cost is that heavy buffering inflates the denominator as well as the numerator, which compresses the rate during severe incidents. Two consequences follow, and both are binding:</p>
+    <div class="note rule"><span class="tag">Normative</span><p>The rate is never presented alone. Impacted Opportunity Seconds accompanies it in every operational view.</p><p><strong>Cohort ranking uses absolute excess impacted seconds, never rate.</strong> A badly degraded cohort carries an inflated denominator, so rate systematically understates the worst cohorts relative to healthy ones. Ranking by rate would bias attribution away from the cohorts it exists to find.</p></div>
+    <p>Issue-Free Opportunity % and its complement are the same number. Only one appears as a headline.</p>
+
+    <h3><span class="n">4.2</span> Reporting metrics, kept separate from QoE KPIs</h3>
+    <p>These answer business questions rather than health questions. They come from different primitives, on different retention, and they are not part of incident detection.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Metric</th><th>Source</th><th>Definition</th></tr></thead>
+      <tbody>
+        <tr><td>Watch time per title</td><td>PlaybackInterval</td><td><code>sum(active_ms)</code> by <code>asset_id</code>. Rendered time, not elapsed time</td></tr>
+        <tr><td>Completion rate</td><td>PlaybackInterval</td><td>Share of intervals reaching <code>COMPLETED</code>, reported alongside mean <code>watched_pct</code></td></tr>
+        <tr><td>Average delivered bitrate</td><td>Minute cube</td><td><code>sum(kbps × active_s) ÷ sum(active_s)</code>. Never an average of averages</td></tr>
+        <tr><td>Time at peak rendition</td><td>Minute cube</td><td><code>sum(peak_rendition_seconds) ÷ sum(active_seconds)</code>. The ladder-decision number</td></tr>
+        <tr><td>Startup percentiles</td><td>PlaybackAttempt</td><td>True percentiles from exact values; the cube's bucketed version is for cohort comparison only</td></tr>
+        <tr><td>Unique viewers</td><td>Interval + attempt rollup</td><td>Distinct-count sketch over <code>device_id</code>. Never from a client session summary (§8.5)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="n">5</span> Context dictionary</h2>
+    <p>Repeated dimensions are encoded once per context rather than on every record. The client assigns compact local integer IDs and emits one <code>ContextDefinition</code> per new context; ingest resolves local IDs into globally queryable dimensions.</p>
+    <div class="tw"><table class="fields">
+      <thead><tr><th>ContextDefinition</th><th>Contract</th></tr></thead>
+      <tbody>
+        <tr><td>session_scope_id</td><td>Scope within which local_context_id is unique</td></tr>
+        <tr><td>local_context_id</td><td>Compact integer assigned by the client</td></tr>
+        <tr><td>dimensions</td><td>Client-observable dimensions only</td></tr>
+        <tr><td>context_version</td><td>Dictionary schema version</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Normative</span><p>Context registration never blocks first telemetry. A client that has just started playing does not wait for a server round trip to learn its own context ID, because the first minutes of a session are the startup minutes and they are the ones most worth having.</p></div>
+    <h3><span class="n">5.1</span> Client-observable versus server-derived</h3>
+    <p>The split matters far beyond byte counts, and it determines what forensic targeting can do (§11.2).</p>
+    <div class="tw"><table>
+      <thead><tr><th>Client-observable</th><th>Server-derived at ingest</th></tr></thead>
+      <tbody>
+        <tr><td>Device class, OS and version, app version, player version, protocol, DRM system, requested CDN hostname, connection type</td><td>ISP and ASN, country / region / city, resolved CDN and edge, client IP class. Derived from the connection; never sent by the client and never pushed back to it.</td></tr>
+      </tbody>
+    </table></div>
+    <h3><span class="n">5.2</span> Cardinality discipline</h3>
+    <p>The context tuple is a cross-product, so every dimension added to it multiplies. Content ID lives on <code>PlaybackInterval</code>, not in the context tuple: it is the highest-cardinality field available and the one that changes most often.</p>
+    <p>This is not only a payload concern. Distinct contexts per minute set the width of the aggregation cube (§8.2), which sets whether cohort attribution can run every window. Context cardinality is therefore a hard budget with an enforced limit and a defined fallback, not a guideline.</p>
+  </section>
+
+  <section id="s6">
+    <h2><span class="n">6</span> Client: state machine and taxonomy</h2>
+    <h3><span class="n">6.1</span> State machine</h3>
+    <div class="flow"><pre>NOT_STARTED ──▶ STARTING ──▶ <b>PLAYING</b> ◀──▶ BUFFERING
+                                 │  ▲
+                                 │  └──── PAUSED
+                                 └──▶ SEEKING ──▶ <b>PLAYING</b>
+
+      ANY ──▶ ERROR</pre></div>
+    <ul>
+      <li><strong>Startup</strong>: initiation to first rendered frame. An attempt-level measurement, reported on the attempt and reflected in the minute where it completes.</li>
+      <li><strong>Rebuffer</strong>: <code>PLAYING → BUFFERING → PLAYING</code>.</li>
+      <li><strong>Seek delay</strong> and <strong>resume delay</strong> are distinct intervals and are not rebuffers.</li>
+      <li><strong>Freeze</strong>: presentation progress stalls without a corresponding buffering event. Detection is explicitly permitted to be platform-specific; the semantic output is not.</li>
+    </ul>
+    <h3><span class="n">6.2</span> Semantic taxonomy</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Code</th><th>Trigger</th></tr></thead>
+      <tbody>
+        <tr><td><code>STARTUP_SLOW</code></td><td>Startup duration exceeds the configured threshold</td></tr>
+        <tr><td><code>REBUFFER</code></td><td>Buffering entered after active playback, beyond the minimum duration, <strong>and recovered within the stall threshold</strong></td></tr>
+        <tr><td><code>STALL_TIMEOUT</code></td><td>Continuous buffering beyond the stall threshold (default 30s). Sets this bit and <strong>clears <code>REBUFFER</code></strong> for the minute</td></tr>
+        <tr><td><code>FREEZE</code></td><td>Presentation progress stalls beyond threshold without a buffering signal</td></tr>
+        <tr><td><code>PLAYBACK_ERROR</code></td><td>Fatal playback failure</td></tr>
+        <tr><td><code>AD_ERROR</code></td><td>Ad request, selection, start, mid-roll, or completion failure, as observable</td></tr>
+        <tr><td><code>DRM_ERROR</code></td><td>License acquisition or decryption failure</td></tr>
+        <tr><td><code>QUALITY_DEGRADATION</code></td><td>Delivered rendition remains materially below the available peak representation for ≥10s, given the actual ladder and device capability. A single rendition change never sets this bit.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Raw player event names stay platform-specific. The semantic layer is small, stable, and versioned, and every record carries the taxonomy and threshold profile that produced it.</p>
+    <h3><span class="n">6.3</span> Permanent stalls are not rebuffers</h3>
+    <p>Nobody sits through sixty seconds of continuous buffering. Counting it as a rebuffer makes rebuffer statistics mean something other than what every reader assumes, which is "recoverable interruptions".</p>
+    <div class="note rule"><span class="tag">Normative — two halves, both required</span><p><strong>Reclassify.</strong> Continuous buffering past the stall threshold sets <code>STALL_TIMEOUT</code> and clears <code>REBUFFER</code> for that minute. Playback transitions to a terminal <code>STALLED_OUT</code> state and emits a terminal record with <code>end_reason = STALL_TIMEOUT</code>.</p>
+    <p><strong>Cap intent accrual</strong> at the threshold plus a short grace, then stop counting. Without this, a viewer who walked away from a spinning player accrues sixty impacted seconds every minute for as long as the app stays open. Those sessions would dominate the excess-impact ranking in §10 and point every incident at whichever cohort leaves televisions running.</p>
+    <p>The by-product is a mid-playback abandonment rate, distinct from the startup <code>ABANDONED</code> in §3.3, and often a better quality signal than rebuffer rate. Cost: one spare bit in the existing bitmap and a state-machine change. <strong>Zero additional bytes.</strong></p></div>
+    <div class="note rule"><span class="tag">Normative</span><p><code>CDN_SWITCH</code> is not in the issue bitmap. It belongs in <code>context_change_flags</code>. This preserves the invariant that a non-zero issue bitmap means the minute was impacted, so a consumer computing "any bit set" cannot accidentally classify a routine CDN failover as a quality incident.</p></div>
+  </section>
+
+  <section id="s7">
+    <h2><span class="n">7</span> Time, ordering, and completeness</h2>
+    <ul>
+      <li>Minute buckets are UTC wall-clock aligned, so simultaneous impact across unrelated viewers lands in the same bucket. This is what makes the hero figure detectable and what makes live-event detection work.</li>
+      <li>Client timestamps are treated as measurements. Ingest records server receipt time and the estimated client offset, and normalizes.</li>
+      <li>Offset is estimated from the round trip on the first successful upload. Until then the client's own clock is used and the records are flagged as un-normalized. A lightweight time sync at SDK init removes this gap for the first batch, which is the startup batch.</li>
+      <li>Upload cadence is one batch per minute, staggered per playback (§7.2). Targeted forensic playbacks drop to 10 seconds.</li>
+      <li>Allowed lateness is explicit and bounded (§8.8), and is shorter than it would otherwise be because the stagger makes arrival times deterministic.</li>
+    </ul>
+
+    <h3><span class="n">7.1</span> Bucket alignment and upload timing are different knobs</h3>
+    <p>They are easy to conflate, and earlier versions specified only the first. <strong>Bucket alignment</strong> decides which sixty seconds of playback aggregate into one record. <strong>Upload timing</strong> decides when the device transmits. Alignment must be wall-clock; transmission must not be.</p>
+    <div class="note rule"><span class="tag">Why alignment cannot be session-relative</span><p>If one viewer's minute runs 12:11:00–12:12:00 and another's runs 12:11:23–12:12:23, an incident at 12:11:30 falls inside one bucket for the first and smears across two for the second. <strong>Synchronised impact is the detection signal, and misalignment dilutes it exactly when it matters.</strong></p><p>Two further consequences: the cube aggregates on <code>GROUP BY minute_ts</code>, and session-relative epochs leave nothing to group on; and it cannot be repaired server-side, because the sub-second detail needed to re-split a minute across wall-clock boundaries is discarded at reduction time. Cross-sectional live-event detection (§9.3) depends on alignment too.</p></div>
+
+    <h3><span class="n">7.2</span> Upload scheduling</h3>
+    <p>Sealing every record on the wall-clock boundary and transmitting immediately would put a million requests into a narrow burst each minute, with collectors idle between bursts.</p>
+    <div class="note rule"><span class="tag">Normative</span><p>A record is sealed on the wall-clock boundary and uploaded at <code>minute_end + (hash(playback_id) mod 60)</code> seconds. Buckets stay aligned; request load flattens to the steady record rate.</p><p>The stagger is <strong>stable per playback</strong>, so a device keeps its slot and the ACK-targeting cadence stays predictable. It derives from <code>playback_id</code> alone and <strong>never from a cohort-correlated field</strong> — hash the ISP and every subscriber of one provider uploads together, at which point a collector wobble in a single slot is indistinguishable from an incident at that ISP.</p></div>
+    <p><strong>The latency cost is close to self-financing.</strong> Event-to-upload becomes the sum of two uniform waits, raising the p95 flush term from 60s to roughly 102s. But a deterministic stagger tells the server exactly when a minute's records should have arrived, so allowed lateness falls from 45s to about 20s. The revised budget in §8.7 lands at 292s, still inside the five-minute target.</p>
+
+    <h3><span class="n">7.3</span> Priority reporting</h3>
+    <p>Two different problems hide under one label, and only one of them is about speed.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Case</th><th>Problem</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Flush on abnormal termination</strong></td><td>On web and CTV the process may not survive to the next cadence tick, so a fatal-error or stall-out record is not delayed — it is lost</td><td><strong>Always.</strong> Cheap, and a durability fix rather than a latency one</td></tr>
+        <tr><td><strong>Priority upload for latency</strong></td><td>Sixty seconds off a 292s budget is 20%, and confirmation still dominates</td><td><strong>Only paired with fast-path detection</strong>. Neither half is worth much alone</td></tr>
+      </tbody>
+    </table></div>
+    <p>Priority earns its place when a catastrophic signal — playback impossible across an entire cohort, a DRM outage, a release that cannot start — is permitted to alert on a single window rather than two. Confirmation then stops dominating and upload latency becomes the leading term. That exception is a deliberate, named relaxation of §8.7's confirmation rule, not a general loosening of it.</p>
+    <div class="note limit"><span class="tag">Mandatory safeguards, not optional hardening</span><p>A global CDN failure makes millions of devices conclude "critical" simultaneously and upload at once, which is a self-inflicted denial of service against the collectors <em>during</em> an incident. Priority therefore carries 0–5s jitter regardless, a per-device rate limit, and a server-side kill switch in the ACK so the channel can be shed under load. Priority records use the same dedupe and idempotency path — it is a flag, never a second pipeline.</p><p>Which conditions qualify for priority is a field in the classification ruleset (§14), so the channel can be narrowed or disabled globally without an app release.</p></div>
+
+    <h3><span class="n">7.4</span> Completeness is a measured quantity</h3>
+    <p>Poor networks cause both bad playback and failed uploads, so missing telemetry is correlated with the exact conditions being measured. Treating absence as health would bias every KPI in the optimistic direction.</p>
+    <div class="note rule"><span class="tag">Normative</span><p>Every minute record carries a monotonic <code>sequence_no</code>. A terminal record bounds the expected tail of each playback. The backend computes a completeness ratio from sequence gaps and unterminated playbacks, and reports it <strong>broken out by platform tier, network class, region, and ISP</strong>. A single aggregate completeness number is not permitted, because the entire point is that loss is non-uniform.</p></div>
+  </section>
+
+  <section id="s8">
+    <h2><span class="n">8</span> Backend architecture</h2>
+    <p>The measurement model is only as good as the pipeline that can serve it inside the latency budget. This section is the part most often left implicit, and it is where the SLO in §9 either becomes real or does not.</p>
+
+    <h3><span class="n">8.1</span> Ingest</h3>
+    <div class="flow"><pre>client batch
+   │
+   ▼
+<b>stateless collector</b>  ── validate schema, reject on sanity bounds
+   │                    ── resolve IP → ISP / ASN / geo / edge  (server-derived dims)
+   │                    ── resolve local context_id → global context key
+   │                    ── stamp server_receipt_ts, estimate clock offset
+   │                    ── dedupe on (playback_id, sequence_no), short-TTL store
+   ▼
+<b>partitioned log</b>  (partition key = playback_id → per-playback ordering)
+   │
+   ├──▶ streaming aggregator  ──▶ <b>minute cube</b>      (§8.2)  ──▶ detector, dashboards
+   ├──▶ raw minute sink       ──▶ <b>columnar store</b>   (§8.2)  ──▶ drill-down, joins
+   └──▶ archive writer        ──▶ <b>Parquet, object storage</b> (§8.9) ──▶ DuckDB, analytics agent
+
+service nodes ── OTel agent: spans → <b>ServiceMinute</b> (§12) ── OTLP metrics, delta
+   │
+   ▼
+<b>service cube</b>  ──▶ aligned view with the minute cube, service SLOs, alert corroboration</pre></div>
+    <p>Collectors are stateless and horizontally scaled. Deduplication uses the idempotency key formed by <code>(playback_id, sequence_no)</code> for minutes and <code>attempt_id</code> for attempts, so client retries are free of double-counting and the client can retry aggressively.</p>
+    <p>The upload response is not empty. It carries clock-offset feedback, config profile pointers, and forensic targeting directives (§11.2).</p>
+
+    <h3><span class="n">8.2</span> Storage and pre-aggregation</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Store</th><th>Contents</th><th>Serves</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Minute cube</strong></td><td>Per <code>(minute, global_context_key, policy_version)</code>, with four hot dimensions denormalized for drill-down (§8.4): summed intent and active seconds for content and ad, impacted seconds per issue bit, issue counters, record count, approximate distinct playbacks</td><td>Dashboards, baselines, anomaly detection, first-pass attribution</td></tr>
+        <tr><td><strong>Raw minute tier</strong></td><td>Individual minute records, partitioned by minute, sorted by context key then playback_id</td><td>Drill-down below cube granularity, interval joins, cohort validation</td></tr>
+        <tr><td><strong>Quality cube</strong></td><td>Per <code>(minute, reduced context, policy)</code>: bucket counts for rebuffer, startup and bitrate; peak-rendition seconds. Reduced tuple — CDN, device class, country, app version — at roughly 2,000 rows per minute</td><td>Percentile and distribution queries, ladder analysis</td></tr>
+        <tr><td><strong>Interval tier</strong></td><td><code>PlaybackInterval</code> records, 90-day TTL</td><td>Watch time, completion, asset-level analysis</td></tr>
+        <tr><td><strong>Content rollup</strong></td><td>Daily per asset × reduced dimensions: watch ms, elapsed ms, completions, playback sketch</td><td>Audience and engagement reporting, multi-year</td></tr>
+        <tr><td><strong>Forensic tier</strong></td><td>Sampled and targeted raw timelines</td><td>Asynchronous investigation only</td></tr>
+        <tr><td><strong>Service cube</strong></td><td>Per <code>(minute, service, operation, edge, region, peer, policy)</code>: requests, cache misses, 5xx, timeouts, latency ladder counts, issue and change flags, summed across agents. ~4,800 rows per minute (§12.4)</td><td>Aligned view, service SLO alerting, alert corroboration</td></tr>
+        <tr><td><strong>Analytics archive</strong></td><td>Hourly Parquet export of the raw minute, attempt and interval tiers, the minute and service cubes, and dimension snapshots, on object storage (§8.9)</td><td>Ad-hoc and historical analysis in DuckDB. Never dashboards, never detection</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Normative</span><p><strong>Histograms do not go in the main cube.</strong> Sixteen bucket counters per metric across 42,000 context rows would roughly double it and slow the detector for the benefit of queries the detector never runs. They go in the separate narrow-dimension quality cube, which is about twenty times smaller because its tuple is deliberately reduced. The main cube stays narrow and fast; percentile questions route to the quality cube.</p>
+    <p>No operational dashboard and no detector reads the raw minute tier. They read the cube. The cube's width is the number of distinct context keys per minute, which is bounded by the cardinality discipline in §5.2 — and that is why §5.2 is a hard budget. Cohort attribution across ten dimensions every window is tractable because it is a set of group-bys over a bounded cube, and intractable if it is a scan over per-playback rows.</p></div>
+
+    <h3><span class="n">8.3</span> Access paths: how a drill-down actually resolves</h3>
+    <p>ClickHouse has no per-column index in the transactional sense. Nothing maps <code>cdn = 'edge-b'</code> to row locations. <strong>The sort key is the index</strong>, it is sparse — one entry per granule of 8,192 rows — and it accelerates only filters on a <em>prefix</em> of it. So <code>(minute_ts, context_key, playback_id)</code> accelerates a time filter, then a single <code>context_key</code> within that time, and nothing else.</p>
+    <p>One consequence deserves stating plainly, because it is easy to assume otherwise. <code>context_key</code> is a surrogate, so a cohort such as "all of edge-b" spans thousands of scattered key values and resolves to many small ranges rather than one contiguous read. Sorting still earns its place through compression and locality; it does not turn a cohort query into a range scan.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Step</th><th>What happens</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Resolve the predicate</td><td><code>cdn = 'edge-b' AND app_version = '7.2.0'</code> evaluated against <code>context_dim</code> — ~180k rows of <code>LowCardinality(String)</code>, resident in memory — returning perhaps 12,000 matching keys</td><td>Sub-millisecond</td></tr>
+        <tr><td>2 · Push the key set down</td><td>Rewritten as <code>context_key IN (…)</code> against the cube</td><td>Negligible</td></tr>
+        <tr><td>3 · Scan the time range</td><td>Granule skipping on <code>minute_ts</code>, then column reads for the matching keys</td><td>The whole query</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Why this is fast is not indexing</span><p><strong>It is that the thing being scanned is small.</strong> A detector window is roughly 210,000 cube rows; a 24-hour dashboard query is ~60M rows across a handful of columns, which is under a second on a few cores. Indexes exist to avoid scanning, and when the scan is already cheap an index is pure overhead on every write.</p><p><strong>The cube's real job is to make indexing unnecessary.</strong> Per-playback rows at 1.44 billion a day would force a serious indexing strategy; aggregating at write time is what buys the freedom not to have one.</p></div>
+
+    <h3><span class="n">8.4</span> When a drill-down does need to be faster</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Option</th><th>How it works</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Denormalize hot dimensions</strong></td><td>Carry <code>cdn</code>, <code>device_class</code>, <code>country</code>, <code>app_version</code> as <code>LowCardinality(String)</code> beside <code>context_key</code>, ordering by <code>(minute_ts, cdn, device_class, context_key)</code>. Common drill-downs become true prefix range reads and never touch the dimension table</td><td>Wider rows; only four or five dimensions can hold the privilege</td></tr>
+        <tr><td><strong>Projections</strong></td><td>A second physical copy of the table under a different sort order, selected automatically per query. The built-in answer to two competing access patterns</td><td>Roughly double the storage for that table</td></tr>
+        <tr><td><strong>Data-skipping indexes</strong></td><td><code>set</code> or <code>bloom_filter</code> on the raw tier, where the table is large and drill-down is rare. They skip granules rather than locating rows</td><td>Helps a selective filter; does nothing for a broad one</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Normative</span><p>The minute cube ships with <strong>four hot dimensions denormalized into the sort key</strong>, retaining <code>context_key</code> for the full join whenever a query needs a dimension that did not make the cut. The quality cube (§8.2) already works this way — its reduced tuple is denormalized by construction.</p><p><strong>Which four is a measurement, not a guess.</strong> It comes from observed query patterns in the shadow phase, and getting it wrong is recoverable with a projection rather than a migration.</p></div>
+
+    <h3><span class="n">8.5</span> Audience and engagement, without a second source of truth</h3>
+    <p>Watch time per title, completion rate, and unique viewers come from the interval and attempt tiers through a daily rollup, with unique counts from a <code>device_id</code> sketch. They are not produced by a client-emitted session summary.</p>
+    <div class="note rule"><span class="tag">Normative</span><p>A client session summary is lost exactly when sessions end badly — app killed, television unplugged, process terminated. Audience numbers built on it would be biased low in precisely the cohorts having problems, which is the same survivorship bias this architecture fights everywhere else, reintroduced at the business-reporting layer.</p><p>If a terminal session record is emitted, it has the job <code>sequence_no</code> has for minutes: <strong>completeness checking, never metric production</strong>. It tells you whether all intervals arrived. It never feeds a published number.</p></div>
+
+    <h3><span class="n">8.6</span> Query serving</h3>
+    <p>Dashboard queries hit the cube and return in interactive time. Drill-down that falls below cube granularity — a specific asset, a specific device model, a free-text dimension — routes to the raw minute tier and is surfaced in the interface as a slower path with its own progress state, never as a blocked dashboard.</p>
+
+    <h3><span class="n">8.7</span> Latency budget</h3>
+    <p>"Near real time" is not a design input. A budget that sums to the SLO is. Every component below has a ceiling, and the ceilings add up.</p>
+    <ul class="budget">
+      <li><span>Seal wait + upload stagger (p95)</span><span class="bar" style="width:35%"></span><span class="v">102s</span></li>
+      <li><span>Upload, ingest, resolution</span><span class="bar" style="width:4%"></span><span class="v">10s</span></li>
+      <li><span>Aggregation window + lateness</span><span class="bar" style="width:7%"></span><span class="v">20s</span></li>
+      <li><span>Detector evaluation cadence</span><span class="bar" style="width:12%"></span><span class="v">30s</span></li>
+      <li><span>Confirmation (2 windows)</span><span class="bar conf" style="width:46%"></span><span class="v">120s</span></li>
+      <li><span>Alert dispatch</span><span class="bar" style="width:4%"></span><span class="v">10s</span></li>
+      <li class="tot"><span>Onset to alert, p95</span><span></span><span class="v">292s ≈ 4.9 min</span></li>
+    </ul>
+    <p><strong>Target: p95 onset-to-alert under five minutes</strong>, with roughly 8 seconds of headroom.</p>
+    <p>The stagger in §7.2 raises the flush term and lowers allowed lateness, because deterministic arrival times let the window close sooner. The trade is near neutral and buys flat collector load. <strong>The headroom is now thin.</strong> Any further latency spend needs a corresponding saving, and the obvious candidate — shortening confirmation — trades directly against false alerts.</p>
+    <p>The flush interval is set to <strong>one minute</strong>, matching the minute cadence of the records themselves. A five-minute batch would be markedly cheaper — the header amortises across five records and compression has more to work with — but it would place a five-minute floor under detection and consume the entire budget before the detector ran once. <strong>Cadence is where bytes are traded for latency</strong>, and §17 prices the trade.</p>
+    <div class="note"><span class="tag">Design consequence</span><p>Confirmation is the dominant term, at 41% of the budget. Confirmation is also the only defence against alerting on one noisy window. <strong>The detection-latency SLO and the false-positive budget are therefore the same dial</strong>, and any proposal to tighten the SLO is a proposal to accept more false alerts. Treat them as one decision, made once, with both numbers written down.</p></div>
+
+    <h3><span class="n">8.8</span> Sealed windows and restatement</h3>
+    <p>Late data — an offline queue flushing hours later — retroactively changes historical aggregates. Without a rule, the number an operator saw during an incident will not match the number in the postmortem, and nobody will know which was wrong.</p>
+    <div class="note rule"><span class="tag">Normative</span><p>Alerting operates on <strong>sealed windows</strong>: window close plus allowed lateness, evaluated once, never revisited. Alert history is immutable.</p><p>Reporting may restate. Restated windows are marked as such in the interface, and the restatement delta is itself a monitored quantity, because a growing delta means delivery is degrading.</p></div>
+    <h3><span class="n">8.9</span> Ad-hoc analytics: off the cluster, into DuckDB</h3>
+    <p>Two workloads want the same data and should not share a machine. <strong>Monitoring and troubleshooting</strong> — the detector, dashboards, drill-down during an incident, the aligned view — need predictable latency on a bounded scan. <strong>Exploration</strong> — six months of rebuffering on 2019 Tizen sets during Sunday live windows, a data scientist fitting an engagement model, an analytics agent iterating on a question — is unpredictable, scan-heavy, and wants history the hot tiers deliberately do not keep. Sizing ClickHouse for both means paying for exploratory peak at monitoring prices and letting a runaway notebook share CPU with the detector.</p>
+    <div class="flow"><pre>raw minute · attempt · interval tiers, minute cube, service cube, dimension snapshots
+   │  hourly, after the window seals (§8.8)
+   ▼
+<b>archive writer</b>  ── drop session_id and device_id; re-key playback_id per archive day
+   │               ── write context_dim and dim_edge snapshots beside the data
+   ▼
+<b>object storage</b>  qoe-archive/{table}/date=…/hour=…/   Parquet, ZSTD, sorted by (context_key, archive_pid)
+   │
+   ▼  on demand: a time range × a cohort × the columns needed
+<b>local DuckDB</b>    laptop or small in-region VM  ──▶ analyst SQL, notebooks, <b>analytics agent</b></pre></div>
+    <div class="flow"><pre><b>-- load once: 2019 Tizen sets, Sunday 18:00–22:00 UTC, last 13 weeks</b>
+.read qoe_metrics_v7.sql          -- the metric macro pack, same definitions as the dashboards
+ATTACH 'tizen19_sundays.duckdb' AS w;
+CREATE TABLE w.minute AS
+SELECT m.minute_ts, m.archive_pid, m.content_intent_s, m.content_impacted_s,
+       m.issue_bits, m.rebuffer_bucket, d.cdn, d.app_version, d.isp
+FROM read_parquet('s3://qoe-archive/minute/date=*/hour=1[8-9]|2[0-1]/*.parquet', hive_partitioning = true) m
+JOIN read_parquet('s3://qoe-archive/dims/context_dim.parquet') d USING (context_key)
+WHERE dayofweek(m.minute_ts) = 0 AND d.device_model LIKE 'Tizen-2019%'
+  AND m.minute_ts &gt;= now() - INTERVAL 13 WEEK;          -- ~110M rows, ~1 GB local
+
+<b>-- then iterate locally, as often as you like</b>
+SELECT date_trunc('week', minute_ts) AS wk, cdn,
+       issue_free_pct(content_impacted_s, content_intent_s) AS ifo   -- sum/sum, never avg of avg
+FROM w.minute GROUP BY ALL ORDER BY wk, ifo;</pre></div>
+    <p><code>context_dim</code> is append-only, so one current snapshot resolves every historical key. Questions about cohorts read the archived cube, which is twenty times smaller; questions about individual playbacks read archived minutes.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Quantity, at 1M peak concurrent</th><th>Planning figure</th></tr></thead>
+      <tbody>
+        <tr><td>Archive volume</td><td class="num">~13 GB/day of Parquet — ~11 GB minutes (1.44B rows), ~2 GB everything else</td></tr>
+        <tr><td>13 months on object storage</td><td class="num">~5 TB; roughly $100–120/month at standard list price, less on infrequent-access tiers</td></tr>
+        <tr><td>A typical working set</td><td class="num">One device family or one region for a month: 1–40 GB after column pruning</td></tr>
+        <tr><td>Load on ClickHouse</td><td class="num">None</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Normative</span><p><strong>ClickHouse serves monitoring and troubleshooting; exploration runs on the archive.</strong> No ad-hoc or agent workload is pointed at the detector's cluster. The hot tiers keep their short horizons (§16); long questions go to the archive.</p><p><strong>Metric definitions ship with the archive.</strong> The KPI suite (§4), excess impact (§10), the bucket arithmetic of §3.7 and the series-compatibility rule of §13.2 are published as a versioned DuckDB macro pack, so a number computed by an analyst or an agent is the number the dashboard shows. The pack refuses to combine incompatible policy versions, exactly as the aggregators do.</p></div>
+    <p><strong>The analytics agent.</strong> An LLM agent given the macro pack, the dimension snapshots and a DuckDB connection answers exploratory questions in plain language, iterates cheaply, and shows its SQL. It works on a local copy, so a bad query costs a laptop a minute rather than the on-call team an incident. It is bounded to the archive: it never queries ClickHouse, never sees an identifier beyond the day-scoped archive key, and never reads the forensic tier.</p>
+    <p><strong>What it buys beyond cost.</strong> It softens two of the hardest one-way doors in this document. Re-thresholding at bucket resolution (§13.3) becomes possible over thirteen months rather than the hot tier's weeks. And any dimension that lives on a record — content identity on intervals, joined to the asset catalogue — can be broken down historically even though it is deliberately absent from the cube (§5.2).</p>
+    <div class="note limit"><span class="tag">Known limitations</span><p>Not real time: the archive lags by the sealing window plus an hour. A subset is a subset — sample by playback, with a deterministic hash of the archive key, never by row, or per-playback analysis silently breaks. Egress to a laptop outside the cloud region is billed per gigabyte; heavy users run DuckDB on an in-region VM. And the archive holds only what records carry: anything discarded on the device is not recoverable here either.</p></div>
+  </section>
+
+  <section id="s9">
+    <h2><span class="n">9</span> Baselines, mix shift, and detection</h2>
+    <h3><span class="n">9.1</span> Two tests, always independent</h3>
+    <div class="note rule"><span class="tag">Normative</span><p>The mix-shift test and the within-cohort regression test run independently and neither gates the other. A staged app rollout shifts the population toward the new version <em>and</em>, if the new version is worse, degrades it. Those are the same event. A rule that classifies degradation as "mix shift, not regression" when mix adjustment absorbs it will suppress alerts on the single most common cause of real regressions.</p></div>
+    <ul>
+      <li><strong>Mix-shift test</strong>: did the population composition change materially against the reference distribution?</li>
+      <li><strong>Within-cohort test</strong>: did each material cohort move against its own expected baseline?</li>
+      <li>Both findings are reported. "The v7.2 cohort grew from 4% to 31% of traffic and its own issue rate rose 2.4 points" is one sentence and two independent facts.</li>
+      <li>The aggregate KPI is additionally compared against a mix-adjusted counterfactual so operators can see how much of a headline move is composition.</li>
+    </ul>
+    <h3><span class="n">9.2</span> Baseline construction</h3>
+    <p>Streaming traffic is strongly seasonal by time of day, day of week, and event schedule. A flat baseline fires every evening; a trailing average absorbs slow degradation and never fires.</p>
+    <ul>
+      <li>Baselines are seasonal and cohort-aware, modelled on time-of-week, platform class, geography, and live-event state.</li>
+      <li>Sparse cohorts use <strong>hierarchical partial pooling</strong>, borrowing strength from their parent cohort rather than estimating from a handful of noisy minutes. A small ISP in a small region at 3am has no reliable baseline of its own.</li>
+      <li>Baseline versions are retained so historical alerts remain reproducible.</li>
+    </ul>
+    <div class="note rule"><span class="tag">Normative</span><p>No adequate baseline, no historical alert. Cross-sectional detection remains available in that case.</p></div>
+    <h3><span class="n">9.3</span> Large live events</h3>
+    <p>A championship-scale event has no historical precedent to baseline against, and it is the day operators most need detection. The technique changes rather than degrading.</p>
+    <p><strong>Cross-sectional detection</strong>: compare each cohort against concurrent cohorts within the same event window, controlling for stable dimensions, instead of against its own history. Every viewer is watching the same content at the same moment, which makes the comparison unusually clean, and wall-clock-aligned minutes make synchronized population impact visible directly.</p>
+    <h3><span class="n">9.4</span> Detection patterns</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Pattern</th><th>Signature</th><th>Usual cause</th></tr></thead>
+      <tbody>
+        <tr><td>Step change</td><td>Persistent level shift, sustained across windows</td><td>Deployment, config push, routing change</td></tr>
+        <tr><td>Spike</td><td>Short excess, returns to baseline</td><td>Transient network or origin event</td></tr>
+        <tr><td>Cohort regression</td><td>Localized excess with stable aggregate</td><td>Platform, version, or delivery path specific</td></tr>
+        <tr><td>Synchronized block</td><td>Simultaneous impact across unrelated sessions</td><td>Shared infrastructure: CDN, origin, encoder, ad server</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s10">
+    <h2><span class="n">10</span> Cohort attribution</h2>
+    <p>The objective is the cohort explaining the most excess degradation, not the cohort with the worst rate. Those are rarely the same cohort, and the second one is rarely actionable.</p>
+    <div class="flow"><pre><b>excess impact</b> = (cohort observed rate − cohort expected baseline rate) × cohort opportunity seconds</pre></div>
+    <ul>
+      <li>Hierarchical one-dimension-at-a-time drill-down, with bounded interaction testing only where a single dimension leaves substantial excess unexplained.</li>
+      <li>Minimum traffic floor and minimum excess-impact floor, both configured.</li>
+      <li>Persistence across N consecutive windows, unless severity warrants immediate escalation.</li>
+      <li>Multiple-comparison control across the candidate cohort set, because ten dimensions with interactions is thousands of hypotheses per window.</li>
+      <li>Ranking uses absolute excess seconds, per §4.1.</li>
+    </ul>
+    <p>CDN, ISP, region, and device are heavily correlated in practice. The system reports <strong>contributing cohorts</strong> and never claims causation from an aggregate alone.</p>
+    <div class="note"><span class="tag">Example output</span><p>"CDN&nbsp;B on app version 7.x explains 38% of excess rebuffer impact while carrying 7% of viewing opportunity." Every clause is measured. None of them says why.</p></div>
+    <p>Mechanism is established by pulling representative sessions from the forensic tier and reading their timelines, which is the point of §11.</p>
+  </section>
+
+  <section id="s11">
+    <h2><span class="n">11</span> Forensics and targeting</h2>
+    <h3><span class="n">11.1</span> Evidence budget</h3>
+    <ul>
+      <li><strong>Baseline sampling</strong>: a small deterministic session-level sample runs continuously. Because it is unconditional, it captures incident onset and it captures viewers who abandoned before any targeting could reach them.</li>
+      <li><strong>Adaptive sampling</strong>: on detection, raw capture increases for the selected cohort until the investigation window expires.</li>
+      <li><strong>Onset buffer</strong>: a bounded circular raw-event buffer on the client, initial target five minutes, sized to the measured detection-and-targeting latency from §8.7 rather than to a guess.</li>
+      <li>Selection is session-level and deterministic, so a chosen session yields a coherent timeline rather than a scatter of unrelated events.</li>
+    </ul>
+
+    <h3><span class="n">11.2</span> Targeting rides the upload ACK</h3>
+    <p>Cohort predicates are written over dimensions like ISP, region, and resolved CDN edge. <strong>A client cannot evaluate those predicates, because it does not know its own ISP or region</strong> — they are derived from the connection at ingest. Pushing derived attributes down to clients to enable local matching would add a round trip, add a privacy surface, and duplicate server state.</p>
+    <div class="note rule"><span class="tag">Normative</span><p>Predicates are evaluated <strong>server-side at ingest</strong>, against dimensions the server already resolved. The batch upload response carries the targeting directive. The client flushes its rolling buffer and switches to detailed capture on receipt.</p><p>Consequences: targeting latency is bounded by one batch interval; no separate control channel or polling loop is needed; and a targeted playback can drop to a shorter batch interval to tighten the loop further.</p></div>
+    <div class="tw"><table class="fields">
+      <thead><tr><th>ForensicPolicy</th><th>Contract</th></tr></thead>
+      <tbody>
+        <tr><td>policy_id</td><td>Stamped onto every record captured under it</td></tr>
+        <tr><td>predicate</td><td>Cohort definition over server-resolved dimensions</td></tr>
+        <tr><td>sample_rate</td><td>Fraction of matching sessions selected</td></tr>
+        <tr><td>start_ts / expiry_ts</td><td>Bounded lifetime; policies expire rather than persist</td></tr>
+        <tr><td>capture_budget</td><td>Hard ceiling on captured volume and per-device duration</td></tr>
+        <tr><td>targeting_version</td><td>Signed and versioned; stale policies are rejected by clients</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="note limit"><span class="tag">Known limitation</span><p>A viewer who abandons within seconds of an incident may never upload another batch, and so never receives a targeting directive. Continuous baseline sampling and the universal <code>PlaybackAttempt</code> signal reduce this bias. They do not eliminate it. The most impacted sessions remain the hardest to retrieve, and forensic samples should be read with that in mind.</p></div>
+  </section>
+
+  <section id="s12">
+    <h2><span class="n">12</span> Services lane: the same minute, from behind the CDN</h2>
+    <p>Everything up to §11 establishes who was impacted, where, by which issue, and how much. None of it says what the publisher's own delivery chain was doing at the time. Today that answer lives in a different product — an APM or tracing vendor, priced on hosts and ingested spans, with its own clock, its own names and its own retention — and the two are joined by people comparing screenshots in an incident channel. The services lane closes that gap by applying the SDK's discipline to backend OpenTelemetry: measure exactly at the node, reduce semantically at the same wall-clock minute, aggregate to a bounded cube, and keep raw spans on the node unless they are selected as evidence.</p>
+
+    <h3><span class="n">12.1</span> ServiceMinute</h3>
+    <p>An OpenTelemetry Collector already runs beside each critical-path service. It gains the counterpart of the SDK's minute compiler: spans are classified against a pushed ruleset, folded into one record per key, and sealed on the UTC minute. <em>Critical path</em> means the services a playback cannot proceed without — origin shield, packager, license, entitlement, ad decisioning — not every microservice.</p>
+    <div class="tw"><table class="fields">
+      <thead><tr><th>Field</th><th>Contract</th></tr></thead>
+      <tbody>
+        <tr><td>minute_ts</td><td>UTC wall-clock minute, bucketed by span end time, sealed at :00 plus a 5 s grace</td></tr>
+        <tr><td>agent_id</td><td>Emitting agent; the completeness unit. Dropped from the cube, kept in the coverage table</td></tr>
+        <tr><td>sequence_no</td><td>Monotonic per agent. Empty minutes are still sent (§12.6)</td></tr>
+        <tr><td>service, version, op</td><td>Service name and version; normalised operation (route, never raw URL)</td></tr>
+        <tr><td>edge, region, peer</td><td>Conformed dimensions shared with the client lane (§12.3), plus the downstream service</td></tr>
+        <tr><td>requests, cache_miss, errors_5xx, timeouts</td><td>Additive counts over 100% of critical-path spans</td></tr>
+        <tr><td>latency_rungs</td><td>Counts per rung of the shared log ladder — the same bucket edges as the SDK (§3.7), over a wider 40-rung window</td></tr>
+        <tr><td>issue_bits</td><td>Service issue flags such as <code>LATENCY_SLO</code> and <code>ERROR_RATE</code>, set by the ruleset</td></tr>
+        <tr><td>change_flags</td><td>Deploy, scale event, config push, failover. Never an issue, exactly as <code>CDN_SWITCH</code> is not (§6.3)</td></tr>
+        <tr><td>ruleset, profile, ladder_version</td><td>Policy versions; aggregators refuse to join across incompatible ones</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Normative</span><p><strong>Summaries are computed from 100% of critical-path spans, before any sampling decision.</strong> A head-sampled count is a sample. Where full capture is impossible, the record carries OpenTelemetry adjusted counts and is flagged; it is never silently treated as complete.</p><p><strong>Histogram bounds are the shared ladder, fixed and explicit.</strong> OTLP exponential histograms rescale per stream, so two streams — or a client bucket and a server bucket — would not share boundaries. One ladder is what lets a segment-download bucket on a device and a response bucket at the shield mean the same interval.</p></div>
+
+    <h3><span class="n">12.2</span> Same instrument, second instance</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Concern</th><th>Player SDK</th><th>OTel agent</th></tr></thead>
+      <tbody>
+        <tr><td>Record</td><td><code>ExperienceMinute</code> per playback</td><td><code>ServiceMinute</code> per key per agent</td></tr>
+        <tr><td>Clock</td><td>UTC wall-clock minute</td><td>UTC wall-clock minute, by span end time</td></tr>
+        <tr><td>Denominator</td><td>Intent seconds</td><td>Critical-path requests. The units are never added together</td></tr>
+        <tr><td>Issue vs context</td><td>Issue bitmap; <code>CDN_SWITCH</code> in context flags</td><td>Issue bitmap; deploys, scaling, config pushes and failovers in change flags</td></tr>
+        <tr><td>Classification</td><td>Declarative ruleset over a fixed vocabulary (§14)</td><td>OTTL statements over span attributes, pushed as data</td></tr>
+        <tr><td>Transport</td><td>Custom packed binary — every byte on a million devices counts</td><td>Standard OTLP metrics, delta temporality; only alignment and bucket bounds are non-standard</td></tr>
+        <tr><td>Downward channel</td><td>Upload ACK</td><td>OpAMP</td></tr>
+        <tr><td>Completeness</td><td><code>sequence_no</code> per playback</td><td><code>sequence_no</code> per agent; empty minutes still sent</td></tr>
+        <tr><td>Evidence</td><td>Onset buffer, flushed on directive</td><td>Span buffer, flushed on directive</td></tr>
+      </tbody>
+    </table></div>
+    <p>Agents update in hours, so changes that would need an app release on a television are routine here. Versioning is kept anyway, because the value is in the joint series: a ruleset change on either side creates a boundary in the aligned view.</p>
+    <p><strong>Build versus reuse.</strong> The memory limiter, Kubernetes attribute enrichment, OTTL transform, file storage and OpAMP all exist in the Collector today. Two components are new: a minute-summary connector — the stock <code>spanmetrics</code> connector flushes on its own interval rather than on span timestamps and has no classification, sequence numbers or empty-minute envelopes — and a rolling span buffer for evidence. Both are candidates for upstream contribution.</p>
+
+    <h3><span class="n">12.3</span> Conformed dimensions are the join</h3>
+    <div class="note rule"><span class="tag">Normative</span><p>The client lane resolves the CDN edge from the connection at ingest (§5.1); the services lane reads it from a header the CDN injects on origin fetch. If one says <code>edge-b7</code> and the other <code>b7.chi.cdnprovider.net</code>, the join returns nothing and looks like health. <strong>Both resolve into one owned <code>dim_edge</code> and <code>dim_region</code>. An unmapped value is counted and alerted, never dropped.</strong></p></div>
+    <p>Only conformed dimensions cross: edge, region, and through them CDN. App version, device and ISP are client-only; service version and pod are server-only. The aligned view therefore answers "which service path moved with this edge's viewers", not "which service hurt app 7.2.0". Content identity is in neither cube, by design (§5.2).</p>
+
+    <h3><span class="n">12.4</span> The service cube</h3>
+    <p>Summaries for the same key and minute merge across agents by summation into one row — about 4,800 rows a minute and 0.28 GB a day, small enough to keep for months beside the minute cube. Latency quantiles come out of the summed ladder at rung resolution, roughly ±12% on any quantile, stated rather than hidden. Per-agent coverage lives in its own table, one row per agent per minute.</p>
+
+    <h3><span class="n">12.5</span> The aligned view</h3>
+    <p>Because both lanes share the minute and the conformed keys, putting them side by side is a join on coordinates — no trace ids, no viewer ids, no sampling. Every alert from §10 carries the service paths that moved with the contributing cohort in the same sealed window, how far they moved, and which moved first.</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Services degraded, same minute, same edge or region</th><th>Services clean</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Viewers impacted</strong></td><td><strong>Delivery-chain candidate.</strong> Report the service path as contributing, alongside the cohort</td><td><strong>Beyond our services.</strong> CDN edge, ISP, last mile or device; client-side attribution carries the weight</td></tr>
+        <tr><td><strong>Viewers fine</strong></td><td><strong>Absorbed.</strong> Buffers, retries and caching hid it. An early warning and a service SLO page, never a QoE page</td><td>Nothing to do</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note rule"><span class="tag">Normative</span><p><strong>The services lane corroborates; it never triggers.</strong> QoE pages come only from the client lane (§9, §10). The service cube keeps its own SLO alerting on its own units, and requests are never added to opportunity seconds.</p><p><strong>No claim of cause.</strong> Two aligned series moving together with one leading is much stronger evidence than a cohort alone, and still correlation over aggregates. The alert says "moved with", never "caused by".</p></div>
+    <p>It costs nothing in latency. A service minute lands about 20 seconds after its minute ends, against a client p95 of 102 seconds, so the matching service rows are already waiting when the client window seals and the join adds nothing to the 292-second budget (§8.7).</p>
+
+    <h3><span class="n">12.6</span> Evidence and completeness</h3>
+    <p><strong>One policy, two channels.</strong> The control plane fans a <code>ForensicPolicy</code> out to the upload ACK for players (§11.2) and over OpAMP to agents. Each agent keeps a five-minute rolling span buffer on local disk, flushes the spans matching the policy, and the forensic tier reassembles traces by <code>trace_id</code>. A CMCD session id on targeted playbacks links a player's timeline to the exact requests that served it; that mapping exists only inside the access-audited forensic tier (§20, question 6). Holes left by agents that missed the directive or restarted are marked, not papered over.</p>
+    <div class="note rule"><span class="tag">Normative — an empty minute is not a healthy minute</span><p>An agent that handled no requests still sends a sealed envelope with its sequence number. A missing envelope is a coverage gap — a dead node, a partitioned pod — named per agent and reported per cluster and region, never pooled. Without this rule, the node that crashed under the incident is exactly the node whose errors disappear. Where coverage is partial, the aligned view marks service counts as lower bounds.</p></div>
+
+    <h3><span class="n">12.7</span> What it costs, and what it does not replace</h3>
+    <p>At 1M concurrent the planning case is ~140,000 critical-path spans a second across ~320 nodes: ~14.6 MB/s compressed if shipped raw. Minute summaries are ~23 KB/s, and a 0.5% evidence baseline ~73 KB/s. Summary volume scales with distinct keys rather than requests, so a per-agent cardinality budget — default 150 keys per minute, overflow folded into <code>_other</code> and monitored — is the services-lane counterpart of §5.2.</p>
+    <div class="note limit"><span class="tag">Known limitations</span><p>It does not replace general APM: engineers still need traces across every service to debug code. What it removes is the need to ship and index every critical-path span to answer the incident question, and the need for a human to align two products' clocks and naming while viewers are failing. Visibility also stops at the publisher's own services — the CDN's internals, the ISP and the last mile are seen only through the client lane and, where available, CDN logs joined on the same conformed edge. A clean services lane during a viewer incident is itself a finding — "beyond our services" — not an absence of one.</p></div>
+  </section>
+
+  <section id="s13">
+    <h2><span class="n">13</span> Configuration, schema, and series integrity</h2>
+    <h3><span class="n">13.1</span> Configuration is a production risk surface</h3>
+    <p>Remote configuration sets thresholds that every client applies locally. A startup threshold mistakenly pushed at 100ms would flag essentially every minute worldwide and collapse the KPI, with no code change and no deploy.</p>
+    <ul>
+      <li>Client-side sanity bounds on every remote value; out-of-range values are rejected locally and the rejection is reported as telemetry.</li>
+      <li>Staged rollout by platform, app version, and region before global release.</li>
+      <li>Every configuration carries a version, effective time, owner, and audit trail, with a fast rollback path.</li>
+      <li>Remote config changes <strong>classification</strong>. It never changes state machine topology or the observation vocabulary, both of which are fixed at release and heavily tested across platforms. §14 defines exactly where that line falls.</li>
+    </ul>
+    <h3><span class="n">13.2</span> Series compatibility</h3>
+    <div class="note rule"><span class="tag">Normative</span><p>A KPI series is homogeneous only when schema version, taxonomy version, eligibility policy, and threshold profile are compatible across it. Aggregators <strong>refuse</strong> to combine incompatible profiles. A profile change creates a visible series boundary, or records are explicitly normalized to a common policy.</p></div>
+    <h3><span class="n">13.3</span> What cannot be recomputed</h3>
+    <p>Thresholds are applied on-device at collection time. Re-thresholding history is possible only within the resolution retained in <code>issue_counters</code>; a boolean flag cannot be recovered into a duration that was never transmitted. This is the real and permanent cost of edge classification, and it is why counters carry bucketed durations rather than bare booleans. Say it plainly in any comparison against event-centric systems, which can re-derive history at will.</p>
+  </section>
+
+
+  <section id="s14">
+    <h2><span class="n">14</span> Remote classification rulesets</h2>
+    <p>Classification logic will be wrong somewhere, and a meaningful share of the fleet is connected-TV hardware that updates slowly or never. A misclassification that can only be fixed by shipping an app release is therefore a permanently wrong metric on the devices that perform worst — which is exactly where the measurement matters most.</p>
+    <p>The useful boundary is not parameters against logic. It is <strong>whether a change can be expressed over observations the SDK already collects.</strong></p>
+
+    <h3><span class="n">14.1</span> Three tiers</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Tier</th><th>Examples</th><th>Needs a release?</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1 — Parameters</strong></td><td>Thresholds, eligibility floor, stall timeout, bucket boundaries, sample rates</td><td>No (§13)</td></tr>
+        <tr><td><strong>2 — Declarative rules</strong></td><td>Which condition sets which bit, reclassifying an issue, adding a bit in spare bitmap space, per-platform condition overrides, changing how a counter is derived</td><td><strong>No</strong> — this section</td></tr>
+        <tr><td><strong>3 — New inputs</strong></td><td>A new observation in the vocabulary, subscribing to a player event never listened to, freeze detection on a new TV OS, transport or record-type changes</td><td>Yes</td></tr>
+      </tbody>
+    </table></div>
+    <p>Roughly three quarters of post-launch classification changes fall in tiers 1 and 2. The remainder need new inputs, and no configuration mechanism can rescue them.</p>
+
+    <h3><span class="n">14.2</span> The observation vocabulary decides everything</h3>
+    <p>The evaluator can only reason over what the SDK measures, so the vocabulary shipped at release is the hard ceiling on what can ever be changed remotely.</p>
+    <div class="flow"><pre><b>state</b>, prev_state, state_duration_ms, buffering_ms_continuous, buffering_count,
+startup_ms, position_delta_ms, wallclock_delta_ms, rendition_index,
+rendition_max_index, rendition_ms, error_domain, error_code, drm_state,
+asset_type, is_live, ad_pod_position, network_type, player_version</pre></div>
+    <div class="note rule"><span class="tag">Normative — a one-way door</span><p>Ship the vocabulary <strong>deliberately wider than currently needed</strong>. Each additional observation costs almost nothing at runtime and buys a future rule change that needs no release. This decision is made once, at launch, and cannot be retrofitted into devices that will never update again.</p></div>
+
+    <h3><span class="n">14.3</span> Ruleset schema</h3>
+    <p>The SDK ships a fixed evaluator. The rules are data.</p>
+    <div class="flow"><pre>{ "ruleset_version": 7,
+  "rules": [
+    {"id": "rebuffer",
+     "when": ["prev_state=PLAYING", "state=BUFFERING",
+              "state_duration_ms&gt;=500", "buffering_ms_continuous&lt;30000"],
+     "emit": {"bit":"REBUFFER", "count":"rebuffer_count", "bucket":"rebuffer_ms"}},
+
+    {"id": "stall_timeout",
+     "when": ["state=BUFFERING", "buffering_ms_continuous&gt;=30000"],
+     "emit": {"bit":"STALL_TIMEOUT", "clear_bit":"REBUFFER",
+              "terminal":"STALLED_OUT", "cap_intent":true}},
+
+    {"id": "quality_deg", "platform": "tizen&lt;=6.0",
+     "when": ["rendition_index&lt;rendition_max_index", "rendition_ms&gt;=10000"],
+     "emit": {"bit":"QUALITY_DEGRADATION"}}
+  ]}</pre></div>
+    <p>Note that §6.3's stall reclassification — the change that prompted this section — is expressible entirely as a rule. So is a per-platform override for a device family whose player reports renditions differently.</p>
+
+    <h3><span class="n">14.4</span> Why not push executable code</h3>
+    <p>A WebAssembly module or a JavaScript bundle would remove the tier-3 boundary altogether. It is the wrong trade here:</p>
+    <ul>
+      <li>Platform and app-store policy on downloading executable code is restrictive and varies by store. Verify with legal rather than assuming.</li>
+      <li>Legacy CTV engines execute it poorly, and those are already the worst-measured devices in the fleet.</li>
+      <li>Remote code execution across millions of consumer devices is a security surface the organization then owns permanently.</li>
+      <li><strong>The decisive one:</strong> it breaks §13.2. If classification can change arbitrarily, <code>taxonomy_version</code> and <code>threshold_profile_id</code> no longer guarantee that a KPI series means one thing, and the measuring instrument becomes version-indeterminate.</li>
+    </ul>
+    <p>A declarative ruleset keeps that guarantee, because a rule pack is a named, versioned, inspectable artifact rather than opaque behaviour.</p>
+
+    <h3><span class="n">14.5</span> Shadow evaluation</h3>
+    <div class="note rule"><span class="tag">Normative</span><p>A candidate ruleset is evaluated <strong>alongside</strong> the active one. The record is emitted under the active ruleset; a small disagreement summary is emitted beside it. A rule change is therefore validated against live production traffic before it is promoted, with no release and no corrupted series.</p><p>The disagreement summary is also the conversion factor that bridges the series boundary at promotion, so history remains interpretable across the change. This is the Phase 1 shadow-mode discipline (§19) made permanent rather than temporary.</p></div>
+
+    <h3><span class="n">14.6</span> Safety rails</h3>
+    <ul>
+      <li><strong><code>ruleset_version</code> on every record</strong>, carried in the batch header beside the existing policy versions — about two bytes per batch. Aggregators refuse to mix rulesets within one KPI series, exactly as they already refuse to mix threshold profiles (§13.2). A ruleset change creates a visible series boundary.</li>
+      <li><strong>A known-good pack compiled into the binary.</strong> If remote configuration is unreachable, or every candidate fails validation, the SDK falls back to the ruleset it shipped with. A catastrophic configuration incident then degrades to "the semantics we released", never to "no telemetry".</li>
+      <li><strong>Client-side validation before activation.</strong> The pack must parse, reference only known observations, and pass a bounded-complexity check — the evaluator must be total, with no loops and no allocation, because it runs continuously on weak CPUs. Rejections are reported as telemetry.</li>
+      <li><strong>Signing, staged rollout by platform and region, and a kill switch</strong>, as §13.1 already mandates for thresholds. A ruleset is higher-blast-radius configuration, not a different kind of thing.</li>
+    </ul>
+    <div class="note limit"><span class="tag">Cost</span><p>Roughly one engineering sprint for the evaluator and pack format, about two bytes per batch, and continuous evaluator CPU that must be measured on the weakest supported device during Phase 1. The expensive part is not the code. It is the discipline to ship a wide observation vocabulary at launch, when nobody yet knows which observations will turn out to matter.</p></div>
+  </section>
+
+  <section id="s15">
+    <h2><span class="n">15</span> Platform reality</h2>
+    <p>"Durable local queue where supported" quietly contains a large platform matrix. The platforms where durability is weakest are frequently the platforms where quality is worst, which is the dangerous direction for the bias to run.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Tier</th><th>Durable queue</th><th>Exit reliability</th><th>Consequence</th></tr></thead>
+      <tbody>
+        <tr><td>Mobile native</td><td>Yes, file-backed</td><td>Good; background upload windows constrained by OS</td><td>Reference implementation</td></tr>
+        <tr><td>Web</td><td>IndexedDB where available</td><td>Unload hooks unreliable; use keepalive beacons for terminal records</td><td>Terminal records occasionally lost; gap detection covers it</td></tr>
+        <tr><td>Modern CTV</td><td>Small storage quota</td><td>No background execution after app exit</td><td>Bounded queue; drop priority matters</td></tr>
+        <tr><td>Legacy CTV / set-top</td><td>Often none</td><td>Often none</td><td>Structurally higher loss; report separately, never pooled</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note limit"><span class="tag">Known limitation</span><p>On legacy CTV the system measures less reliably than elsewhere, and it does so on the device class most likely to have quality problems. The mitigation is honesty rather than engineering: completeness is reported per tier (§7.4), and a coverage gap on a device class is never rendered in a way that could read as health on that device class.</p></div>
+    <p>Queue overflow uses an explicit drop priority: attempt records and terminal records survive; minute records degrade oldest-first; interval records drop first. Every drop is counted and reported.</p>
+  </section>
+
+  <section id="s16">
+    <h2><span class="n">16</span> Retention and privacy</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Tier</th><th>Horizon</th><th>Identity</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Hot minute</td><td>Days to weeks</td><td>Pseudonymous playback / session / device IDs</td><td>Incident response, drill-down</td></tr>
+        <tr><td>Minute cube</td><td>Months</td><td>None</td><td>Dashboards, baselines, trend</td></tr>
+        <tr><td>Long-term rollup</td><td>Years</td><td>None; approved dimensions only</td><td>KPI history</td></tr>
+        <tr><td>Service cube</td><td>Months</td><td>None; service, edge and region keys only</td><td>Aligned view, service SLOs, trend</td></tr>
+        <tr><td>Analytics archive</td><td>13 months, configurable</td><td>Day-scoped archive key only; session and device IDs dropped</td><td>Ad-hoc and historical analysis, analytics agent (§8.9)</td></tr>
+        <tr><td>Forensic raw</td><td>Short and bounded</td><td>Pseudonymous, access-audited</td><td>Evidence</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li>Identifiers do not survive into the cube or the rollups. Historical session drill-down is therefore deliberately unavailable beyond the hot tier, which is a retention decision made once and made visible. The analytics archive keeps one, deliberately weakened: <code>playback_id</code> re-keyed with a key that rotates daily and is then destroyed, so a playback is coherent within a day and unlinkable across days or to a device. Whether even that is acceptable for thirteen months is a privacy-review decision (§20, question 10).</li>
+      <li>Rollup schemas must preserve the dimensions needed for the historical questions the organization intends to ask. A dimension discarded at rollup time is a question that can never be answered again, so rollup schema design precedes rollout, not follows it.</li>
+      <li>Minimum cohort sizes are enforced for drill-down and for any interface that exposes individual sessions.</li>
+      <li>Regional processing and deletion controls are configurable per deployment.</li>
+      <li>Participation and opt-out bias is measured. Non-random participation biases population KPIs, so the representativeness of the participating population is itself a reported metric.</li>
+      <li>Session, time, device, network, and geography together constitute behavioral telemetry. Treat it accordingly regardless of how operational the intent is.</li>
+    </ul>
+  </section>
+
+  <section id="s17">
+    <h2><span class="n">17</span> Cost and scale</h2>
+    <h3><span class="n">17.1</span> Per viewer-hour, scale-free</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Wire volume, one viewer-hour</th><th class="num">This design</th><th class="num">Event / heartbeat standard</th></tr></thead>
+      <tbody>
+        <tr><td>Minute records — 60 × ~78 B</td><td class="num">4,680 B</td><td class="num">—</td></tr>
+        <tr><td>Heartbeats and events, compressed</td><td class="num">—</td><td class="num">~95,000 B</td></tr>
+        <tr><td>Attempts (~3) and intervals (~5)</td><td class="num">320 B</td><td class="num">in stream</td></tr>
+        <tr><td>Context definitions</td><td class="num">~60 B</td><td class="num">repeated per event</td></tr>
+        <tr><td><strong>Total</strong></td><td class="num"><strong>~5.1 KB</strong></td><td class="num"><strong>~95 KB</strong></td></tr>
+      </tbody>
+    </table></div>
+    <p>Roughly <strong>19×</strong> on the wire. The §3.7 additions did not move it: bitrate and peak-rendition seconds occupy bytes already reserved in the record, <code>STALL_TIMEOUT</code> uses a spare bit, and exact startup rides attempt records that occur three times an hour rather than sixty.</p>
+
+    <h3><span class="n">17.2</span> What the additions cost</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Change</th><th class="num">Wire</th><th class="num">Storage</th></tr></thead>
+      <tbody>
+        <tr><td>Bitrate bucket + peak-rendition seconds</td><td class="num">0 B — into reserved</td><td class="num">+0.86 GB/day</td></tr>
+        <tr><td><code>STALL_TIMEOUT</code> and intent capping</td><td class="num">0 B</td><td class="num">0</td></tr>
+        <tr><td>Cube bitrate sums</td><td class="num">—</td><td class="num">+0.18 GB/day</td></tr>
+        <tr><td>Interval: active_ms, completion, bitrate, end_reason</td><td class="num">+6 B/row</td><td class="num">+0.40 GB/day</td></tr>
+        <tr><td>Attempt: exact startup</td><td class="num">+3 B/row</td><td class="num">negligible</td></tr>
+        <tr><td><code>ruleset_version</code> in the batch header (§14.6)</td><td class="num">~2 B/batch</td><td class="num">negligible</td></tr>
+        <tr><td>Quality cube</td><td class="num">—</td><td class="num">+0.12 GB/day</td></tr>
+        <tr><td><strong>Total</strong></td><td class="num"><strong>0%</strong></td><td class="num"><strong>+~1.5 GB/day, ≈14%</strong></td></tr>
+      </tbody>
+    </table></div>
+    <p>Three of the five reserved bytes remain unused.</p>
+    <p>Outside the client wire budget, v7 adds the service cube (+0.28 GB/day in ClickHouse, §12.4) and the analytics archive (~13 GB/day of Parquet on object storage, §8.9). Neither touches the device.</p>
+    <h3><span class="n">17.3</span> Against an event-centric build</h3>
+    <div class="tw"><table>
+      <thead><tr><th>At 1M concurrent viewers</th><th>Event-centric</th><th>Semantic hot path</th></tr></thead>
+      <tbody>
+        <tr><td>Record rate</td><td class="num">20 events/viewer/min ≈ 333k/s</td><td class="num">1 minute record/viewer/min ≈ 16.7k/s</td></tr>
+        <tr><td>Payload</td><td class="num">≈500 B/event ≈ 167 MB/s</td><td class="num">≈80 B/minute ≈ 1.3 MB/s</td></tr>
+        <tr><td>Daily, uncompressed</td><td class="num">≈14.4 TB/day</td><td class="num">≈115 GB/day</td></tr>
+        <tr><td>Dashboard read path</td><td>Scans session or event rows</td><td>Reads the bounded cube</td></tr>
+      </tbody>
+    </table></div>
+    <p>The two tables use different bases on purpose, and they reconcile. §17.1 is compressed bytes on the wire; this table is uncompressed payload. Event streams compress about 6× (≈600 KB → ≈95 KB per viewer-hour, ≈14.4 → ≈2.3 TB/day). Packed minute records are already dense and barely compress (≈5 KB per viewer-hour, ≈115–120 GB/day either way). So the multiple is ≈19× on the wire and ≈125× before compression. Never quote one side compressed against the other uncompressed.</p>
+    <h3><span class="n">17.4</span> Against buying instead</h3>
+    <div class="note limit"><span class="tag">The efficiency gain is not the business case</span><p><strong>No established vendor prices by the byte.</strong> Commercial QoE analytics is priced per peak concurrent viewer, per viewing hour, or per session, so telemetry efficiency never appears on the invoice. Against realistic vendor retention practice this design is roughly 20–30× on storage and 10–20× on infrastructure, and none of that is a discount on a licence.</p>
+    <p>Fully loaded, building is usually <em>more</em> expensive than buying at this scale: infrastructure in the low hundreds of thousands annually plus six to ten engineers across SDKs, backend, data and on-call. A pitch built on telemetry savings ends at the first question about headcount.</p>
+    <p><strong>Build wins when two or more of these hold:</strong> the platform team already exists and this is marginal cost; vendor pricing is per viewing hour and watch time is very large; QoE must be fused with data that cannot leave the organization such as revenue, entitlement or churn; the semantics needed are not sold — impact-ranked attribution, the two independent tests, intent-time denominators, stall reclassification; multi-CDN delivery requires independent ground truth for accountability; or viewer QoE and service telemetry are today bought separately and correlated by hand. The efficiency then makes the build affordable to <em>run</em>, which is a different claim from it paying for itself.</p></div>
+    <div class="note"><span class="tag">Read this as planning arithmetic, not a benchmark</span><p>Every input above is an assumption. Real savings depend on the actual player event rate, payload sizes, compression ratios, batching, retention tiers, and raw sampling rate. Benchmark against captured production event streams during Phase 1 before any savings figure is quoted externally. The load-bearing claim is the change in <em>scaling law</em> — from events per session to viewing minutes — not any particular multiple.</p></div>
+    <h3><span class="n">17.5</span> Against today's disconnected stack</h3>
+    <p>The common arrangement at this scale is three or four separately bought systems: a QoE vendor priced per view or viewing hour, an APM and tracing vendor priced per host and per ingested span, CDN logs shipped into a SIEM or warehouse, and a warehouse for ad-hoc analysis. Each keeps its own copy, at its own granularity, under its own names, and the join between them is performed by people during incidents.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Capability</th><th>Disconnected stack</th><th>This design</th></tr></thead>
+      <tbody>
+        <tr><td>Viewer QoE</td><td>Vendor licence per view or hour; session rollups; tiered granularity over time</td><td>Minute records, ~5 KB per viewer-hour on the wire (§17.1)</td></tr>
+        <tr><td>Delivery-path service behaviour</td><td>Every span ingested and indexed, or head-sampled and incomplete</td><td>ServiceMinute from 100% of spans at ~23 KB/s; spans leave the node only as evidence</td></tr>
+        <tr><td>Joining the two</td><td>Humans, screenshots, two clocks, two names for one edge</td><td>Join on minute and conformed edge and region, attached to every alert</td></tr>
+        <tr><td>Ad-hoc and historical</td><td>Warehouse copy or vendor export, priced per query, seat or scan</td><td>Parquet on object storage, ~5 TB for 13 months; local DuckDB</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note limit"><span class="tag">"A fraction of the cost", stated carefully</span><p>The infrastructure claim is strong: both lanes ship summaries, and the archive sits on the cheapest storage tier there is. The total-cost claim depends on what is retired. Savings arrive only when the QoE licence is replaced and the critical-path share of APM span ingest is turned down, and engineering headcount (§17.4) does not shrink with bytes. Measure both in Phase 1 shadow before quoting a multiple.</p></div>
+  </section>
+
+  <section id="s18">
+    <h2><span class="n">18</span> Failure modes and controls</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Risk</th><th>Control</th><th>Section</th></tr></thead>
+      <tbody>
+        <tr><td>Start failures invisible to a minute-based KPI</td><td>PlaybackAttempt with provisional emission</td><td>3.3</td></tr>
+        <tr><td>Worst minutes excluded by an eligibility floor</td><td>Intent-time eligibility plus issue override</td><td>3.5</td></tr>
+        <tr><td>Ad failures reported as content degradation</td><td>Separate content and ad bitmaps</td><td>3.4</td></tr>
+        <tr><td>Concurrent players colliding on one key</td><td>playback_id as the record key</td><td>3.2</td></tr>
+        <tr><td>Telemetry loss correlated with bad networks</td><td>Queue, retry, idempotency, sequence-gap completeness by tier</td><td>7.4, 15</td></tr>
+        <tr><td>Mix shift mistaken for regression, or masking it</td><td>Two independent tests, both reported</td><td>9.1</td></tr>
+        <tr><td>False cohort discovery</td><td>Partial pooling, floors, persistence, multiple-comparison control</td><td>9.2, 10</td></tr>
+        <tr><td>No baseline during a major live event</td><td>Cross-sectional within-event comparison</td><td>9.3</td></tr>
+        <tr><td>Incident onset missed by targeting latency</td><td>Baseline sampling plus rolling buffer sized to measured latency</td><td>11.1</td></tr>
+        <tr><td>Targeting impossible on server-derived dimensions</td><td>Server-side predicate evaluation on the upload ACK</td><td>11.2</td></tr>
+        <tr><td>Bad config with global blast radius</td><td>Sanity bounds, staged rollout, rollback</td><td>13.1</td></tr>
+        <tr><td>Viewer impact and service behaviour joined by hand during incidents</td><td>ServiceMinute on the same minute and conformed dimensions; aligned view on every alert</td><td>12.5</td></tr>
+        <tr><td>Edge named differently by CDN header and connection resolver</td><td>One owned <code>dim_edge</code>; unmapped values alerted, never dropped</td><td>12.3</td></tr>
+        <tr><td>Dead service node reads as healthy</td><td>Empty-minute envelopes; per-agent coverage reported per cluster</td><td>12.6</td></tr>
+        <tr><td>Head-sampled spans summarised as complete</td><td>Summaries from 100% of spans before sampling; adjusted counts flagged</td><td>12.1</td></tr>
+        <tr><td>Service correlation read as root cause</td><td>Corroboration only; "moved with", never "caused by"; QoE pages from the client lane only</td><td>12.5</td></tr>
+        <tr><td>Exploratory queries starving the detector</td><td>Ad-hoc and agent workloads run on the Parquet archive in DuckDB, never on the monitoring cluster</td><td>8.9</td></tr>
+        <tr><td>Analyst or agent computes a different KPI</td><td>Versioned metric macro pack; incompatible policies refused</td><td>8.9</td></tr>
+        <tr><td>Synchronised upload burst each minute</td><td>Deterministic per-playback stagger across the minute</td><td>7.2</td></tr>
+        <tr><td>Priority channel self-DDoS during a global incident</td><td>Jitter, per-device rate limit, ACK kill switch</td><td>7.3</td></tr>
+        <tr><td>Fatal-error record lost when the process dies</td><td>Flush on abnormal termination</td><td>7.3</td></tr>
+        <tr><td>Classification bug unfixable on non-updating devices</td><td>Declarative rulesets pushed as data; known-good pack in the binary</td><td>14</td></tr>
+        <tr><td>A ruleset change silently redefining a KPI series</td><td><code>ruleset_version</code> on records; shadow evaluation before promotion</td><td>14.5, 14.6</td></tr>
+        <tr><td>Silent KPI discontinuity</td><td>Policy versions on records; aggregators refuse to mix</td><td>13.2</td></tr>
+        <tr><td>Historical numbers that change after the fact</td><td>Sealed alerting windows; marked restatement</td><td>8.8</td></tr>
+        <tr><td>Context cardinality explosion</td><td>Client-local dictionary, bounded dimensions, content on intervals</td><td>5.2</td></tr>
+        <tr><td>Forensic cost explosion</td><td>Capture budgets, policy expiry, bounded retention</td><td>11, 16</td></tr>
+        <tr><td>SDK divergence across platforms</td><td>Reference implementation, conformance suite, replay parity tests</td><td>19</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s19">
+    <h2><span class="n">19</span> Validation and rollout</h2>
+    <p>Phases are ordering constraints with exit criteria. Durations are placeholders until team size is fixed; the dependencies between phases are not.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Phase</th><th>Work</th><th>Exit criteria</th></tr></thead>
+      <tbody>
+        <tr><td><strong>0 — Reference</strong></td><td>Reference state machine, <strong>ruleset evaluator and observation vocabulary (§14)</strong>, conformance suite, replay harness over captured native event streams</td><td>Replay of production event streams produces semantic output matching trusted reference calculations within an agreed tolerance; the shipped ruleset reproduces the §6.2 taxonomy exactly as data</td></tr>
+        <tr><td><strong>1 — Shadow</strong></td><td>SDK on web plus one native platform; ingest, cube, raw tier; runs beside existing telemetry with no alerting; ServiceMinute on the origin shield in shadow; archive writer and metric macro pack</td><td>Semantic parity holds on live traffic; completeness measured per tier; shadow ruleset evaluation exercised end to end; evaluator CPU measured on the weakest supported device; CPU, memory, battery, and network overhead within budget; the cost model in §17 replaced with measured numbers; archive KPIs reproduce the cube to rounding; edge mapping between lanes complete</td></tr>
+        <tr><td><strong>2 — Advisory</strong></td><td>Baselines, mix-shift separation, detector, attribution; advisory dashboards only; aligned view attached to advisory alerts</td><td>Precision and recall measured against known historical incidents and injected cohort-specific faults; attribution identifies injected cohorts without excessive false discovery; the aligned view reproduces the hand correlation of known past incidents</td></tr>
+        <tr><td><strong>3 — Evidence</strong></td><td>Forensic tier, targeting via ACK, rolling buffer, capture budgets; span buffer and OpAMP flush driven by the same policy</td><td>Injected incident onset captured end to end; targeting latency measured against the §8.7 budget; buffer size set from that measurement</td></tr>
+        <tr><td><strong>4 — Operational</strong></td><td>Remaining platforms including CTV tiers; operational alerting; staged retirement of redundant event-centric hot-path telemetry; remaining critical-path services</td><td>Alert quality accepted by on-call; per-tier completeness accepted; rollback rehearsed under an invalid config push</td></tr>
+      </tbody>
+    </table></div>
+    <p>Cross-cutting validation, run continuously from Phase 1: abandonment and retry semantics, app death, offline queue behavior, duplicate delivery, clock skew, staged config rollout and rollback under extreme values, and live-event cross-sectional detection where no historical baseline exists.</p>
+  </section>
+
+  <section id="s20">
+    <h2><span class="n">20</span> Open questions</h2>
+    <p>These are unresolved and each one blocks something. They are listed so review can close them rather than discover them during implementation.</p>
+    <div class="note open"><span class="tag">1 · Attempt definition on autoplay surfaces</span><p>Browse and feed surfaces autoplay aggressively. Whether those count as playback attempts changes Playback Start Success % by a large factor and is a product decision, not an engineering one. Blocks: KPI baseline, Phase 2 targets.</p></div>
+    <div class="note key" style="margin-bottom:1rem"><span class="tag">Resolved since v4</span><p><strong>QUALITY_DEGRADATION stays out of the headline KPI.</strong> Quality is now measured rather than flagged — bitrate buckets and peak-rendition seconds (§3.7) give a real quality metric, so the bit no longer has to carry that weight. <strong>Ad and content separation</strong> is resolved by <code>asset_type</code> on intervals plus the two bitmaps. <strong>Permanent stalls</strong> are resolved in §6.3.</p></div>
+    <div class="note open"><span class="tag">2 · Ladder granularity</span><p>Time at peak rendition is one byte. Seconds at each rung of the ladder would be about eight, and would answer encoding-ladder questions a single mean cannot — a viewer oscillating between 5800 and 1600 kbps averages to a number nobody experienced. Worth the bytes only if ladder decisions are actually made from this data. Blocks: quality cube schema.</p></div>
+    <div class="note open"><span class="tag">3 · Observation vocabulary scope</span><p>Which observations ship in the first SDK (§14.2). Too narrow and future rule changes need releases the CTV fleet will not take; too wide and the evaluator carries dead weight on weak CPUs. This cannot be retrofitted to non-updating devices, so it is decided once. Blocks: SDK v1 scope, and it is irreversible.</p></div>
+    <div class="note open"><span class="tag">4 · Context cardinality budget</span><p>The cube width depends on distinct contexts per minute on real traffic. This has not been measured. If it is much larger than expected, dimensions move out of the context tuple. Blocks: cube design, §8.2 sizing.</p></div>
+    <div class="note open"><span class="tag">5 · Forensic tier contents</span><p>Raw events, or reconstructed timelines written at capture time? Raw is cheaper to write and more faithful; reconstructed is far cheaper to read during an incident, which is when reading happens. Blocks: forensic storage design.</p></div>
+    <div class="note open"><span class="tag">6 · CMCD correlation key</span><p>CMCD provides standardized client-to-CDN delivery context and is complementary rather than competing. Joining it to this data requires a shared session correlation key present in both CDN logs and telemetry, with its own privacy review. Blocks: CDN correlation workflows.</p></div>
+    <div class="note open"><span class="tag">7 · Multi-tenancy</span><p>If this is offered to multiple publishers, isolation of config profiles, taxonomy versions, context dictionaries, and forensic access is unspecified. Blocks: anything beyond first-party use.</p></div>
+    <div class="note open"><span class="tag">8 · Combined ad and content headline number</span><p>Executives will want one number. Combining content and ad QoE requires a weighting decision that is explicitly a product judgement. Blocks: executive dashboard.</p></div>
+    <div class="note open"><span class="tag">9 · Critical-path instrumentation and the edge header</span><p>The services lane needs every critical-path service emitting OTel spans with a normalised route, and a CDN willing to inject its edge identifier on origin fetch. Coverage of both is unmeasured, and a CDN that will not send the header leaves only region as a join key. Blocks: services lane Phase 1.</p></div>
+    <div class="note open"><span class="tag">10 · Archive identity horizon</span><p>A day-scoped re-keyed <code>playback_id</code> held for thirteen months. Within-day per-playback analysis needs it; privacy review may not allow it. The fallback is an archive of per-context-minute aggregates only, which keeps cohort history and loses per-playback questions. Blocks: archive schema.</p></div>
+    <div class="note open"><span class="tag">11 · Ownership of conformed dimensions</span><p><code>dim_edge</code> and <code>dim_region</code> become shared infrastructure between the video and platform teams. Someone owns the mapping, the unmapped-value alert, and the change when a CDN renames its edges. Blocks: aligned view in production.</p></div>
+  </section>
+
+  <section id="s21">
+    <h2><span class="n">21</span> Implementation invariants</h2>
+    <p>If an implementation violates any of these, it is not this architecture.</p>
+    <ol>
+      <li>A failed start is never invisible because no viewing minute was created.</li>
+      <li>A minute with playback intent and an observed issue is eligible and impacted, however little video played.</li>
+      <li><code>issue_bitmap</code> means experience impact and nothing else; context changes live in their own field.</li>
+      <li>Content and ad experience are independently computable from a single minute record.</li>
+      <li>Records are keyed on <code>playback_id</code>, so concurrent players never collide.</li>
+      <li>Context registration never blocks first telemetry, and content identity is not in the context cross-product.</li>
+      <li>Mix shift and within-cohort regression are evaluated independently and both are reported.</li>
+      <li>No adequate baseline means no historical alert; cross-sectional detection remains available.</li>
+      <li>Cohort ranking uses absolute excess impacted seconds, never rate.</li>
+      <li>Forensic predicates are evaluated server-side; clients are never told their derived dimensions.</li>
+      <li>Completeness is measured from sequence gaps and reported per platform tier, never pooled.</li>
+      <li>Alerting reads sealed windows; restatements are visible and monitored.</li>
+      <li>Every record carries enough version information to prevent a silent KPI discontinuity.</li>
+      <li>Remote configuration is bounded, staged, auditable, and reversible.</li>
+      <li>Minute buckets are wall-clock aligned; uploads are staggered by a hash of playback_id that is never cohort-correlated.</li>
+      <li>Priority upload always carries jitter, a per-device rate limit, and a server-side kill switch.</li>
+      <li>Remote rulesets change classification only. State machine topology and the observation vocabulary are fixed at release.</li>
+      <li>Every record carries <code>ruleset_version</code>, and aggregators refuse to mix rulesets within one series.</li>
+      <li>A known-good ruleset ships inside the binary and is the fallback whenever remote configuration is unreachable or invalid.</li>
+      <li>Identifiers do not survive into warm or long-term tiers. The analytics archive carries only a day-scoped key that cannot be linked across days or to a device.</li>
+      <li>No operational dashboard depends on raw-session retrieval.</li>
+      <li>No query path depends on a per-row index. The cube is sized so that scanning it costs less than indexing it would.</li>
+      <li>Continuous buffering past the stall threshold is <code>STALL_TIMEOUT</code>, not <code>REBUFFER</code>, and stops accruing intent seconds.</li>
+      <li>Durations are bucketed where they must merge in a cube and exact where volume permits; bucket indices are never averaged.</li>
+      <li>Audience and engagement derive from intervals and attempts. A client session summary is a completeness signal, never a metric source.</li>
+      <li>Histogram counters live in the quality cube, never in the detector's cube.</li>
+    <li>QoE alerts come only from the client lane. The services lane corroborates and never pages on viewer experience; requests are never added to opportunity seconds.</li>
+      <li>Service summaries are computed from 100% of critical-path spans before sampling, on the shared ladder, with empty-minute envelopes. A missing agent is a coverage gap, never a zero.</li>
+      <li>Client and service lanes join only on conformed dimensions; an unmapped edge is alerted, never dropped.</li>
+      <li>No exploratory or agent workload runs on the monitoring cluster. It runs on the archive, with the same metric definitions.</li>
+    </ol>
+  </section>
+
+  <section id="s22">
+    <h2><span class="n">22</span> Design principle</h2>
+    <p style="font-size:1.12rem; line-height:1.55; max-width:60ch">Observe everything cheaply. Detect population change honestly. Explain impact without claiming cause. Line viewers and services up on one clock. Keep evidence where evidence is needed.</p>
+    <p>The architecture uses different primitives for acquisition, population experience, and exact consumption because no single abstraction represents all three without distorting at least one. The separation of universal observation from sampled evidence is what buys the scale, and the discipline about what each record can and cannot support is what makes the resulting numbers worth acting on.</p>
+    <p>v7 extends the same discipline in two directions: behind the CDN, where service nodes reduce spans to minutes on the same clock and dimensions as the players, and after the fact, where the per-playback tiers land as Parquet that anyone — or any agent — can load and question without touching the system that pages people.</p>
+  </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="shell"><p>Streaming Experience Observability · Integrated specification v7 · Supersedes v1–v6 in full. Companion: end-to-end data flow, services lane and analytics path.</p></div>
+</footer>
+
+<script>
+(function(){
+  // minute grid: 6 viewers x 24 wall-clock minutes
+  // 0 = not watching, 1 = issue-free, 2 = impacted
+  var rows = [
+    { label:"viewer A", cells:[1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,1,1,1] },
+    { label:"viewer B", cells:[0,0,1,1,1,1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1,1,0,0] },
+    { label:"viewer C", cells:[1,1,1,2,1,1,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,1,1,1] },
+    { label:"viewer D", cells:[0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0] },
+    { label:"viewer E", cells:[1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,1,1,1,1,1,1,1,1] },
+    { label:"viewer F", cells:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,0,0] }
+  ];
+  var g = document.getElementById("mgrid");
+  if (g) {
+    rows.forEach(function(r){
+      var row = document.createElement("div");
+      row.className = "mrow";
+      var lab = document.createElement("span");
+      lab.className = "rlabel";
+      lab.textContent = r.label;
+      row.appendChild(lab);
+      r.cells.forEach(function(v){
+        var c = document.createElement("span");
+        c.className = "cell" + (v===1 ? " g" : v===2 ? " b" : "");
+        row.appendChild(c);
+      });
+      g.appendChild(row);
+    });
+  }
+  var ax = document.getElementById("axis");
+  if (ax) {
+    var first = document.createElement("span");
+    first.textContent = "";
+    ax.appendChild(first);
+    for (var i=0;i<24;i++){
+      var s = document.createElement("span");
+      s.textContent = (i % 6 === 0) ? ("12:" + String(i).padStart(2,"0")) : "";
+      ax.appendChild(s);
+    }
+  }
+
+  // contents
+  var toc = document.getElementById("toc");
+  var secs = Array.prototype.slice.call(document.querySelectorAll("main section"));
+  if (toc) {
+    secs.forEach(function(sec){
+      var h = sec.querySelector("h2");
+      if (!h) return;
+      var n = h.querySelector(".n");
+      var num = n ? n.textContent : "";
+      var text = h.textContent.replace(num, "").trim();
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = "#" + sec.id;
+      a.innerHTML = '<span class="n">' + num + '</span>' + text;
+      li.appendChild(a);
+      toc.appendChild(li);
+    });
+  }
+
+  // active section highlight
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  if ("IntersectionObserver" in window && links.length) {
+    var byId = {};
+    links.forEach(function(a){ byId[a.getAttribute("href").slice(1)] = a; });
+    var visible = {};
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ visible[e.target.id] = e.isIntersecting; });
+      var current = null;
+      for (var i=0;i<secs.length;i++){ if (visible[secs[i].id]) { current = secs[i].id; break; } }
+      links.forEach(function(a){ a.classList.remove("on"); });
+      if (current && byId[current]) byId[current].classList.add("on");
+    }, { rootMargin: "0px 0px -72% 0px", threshold: 0 });
+    secs.forEach(function(s){ io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>
