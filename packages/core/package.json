@@ -1,0 +1,19 @@
+{
+  "name": "@observa/core",
+  "version": "0.1.0",
+  "description": "Phase 0 reference: state machine, ruleset evaluator, minute compiler and wire packing for Streaming Experience Observability (spec v7).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}
