@@ -169,6 +169,23 @@ describe("freeze and quality", () => {
     expect(m.issue_counters.freeze_count).toBe(1);
   });
 
+  it("does not read a long silence between position samples as a freeze", () => {
+    const { recs } = run(
+      [
+        ...start(0, 0),
+        { type: "progress", t: s(3), position_ms: 3000 },
+        { type: "progress", t: s(6), position_ms: 6000 },
+        // The sampler goes quiet for two minutes, then reports an ad's position.
+        { type: "asset", t: s(130), asset_id: "ad-1", asset_type: "AD", duration_ms: 12_000 },
+        { type: "progress", t: s(142), position_ms: 12_000 },
+        { type: "asset", t: s(142), asset_id: "show-1", asset_type: "CONTENT", duration_ms: null },
+        { type: "progress", t: s(150), position_ms: 20_000 },
+      ],
+      240,
+    );
+    for (const m of minutes(recs)) expect(m.content_issue_bitmap | m.ad_issue_bitmap).toBe(0);
+  });
+
   it("keeps QUALITY_DEGRADATION out of the headline mask", () => {
     expect(HEADLINE_ISSUE_MASK & (1 << IssueBit.QUALITY_DEGRADATION)).toBe(0);
     expect(HEADLINE_ISSUE_MASK & (1 << IssueBit.REBUFFER)).not.toBe(0);

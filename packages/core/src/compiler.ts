@@ -117,6 +117,13 @@ const TRANSITIONS: Record<string, ReadonlySet<PlayerState>> = {
 
 /** Lag between wall clock and media position below this is jitter, not a stall. */
 const PROGRESS_JITTER_MS = 250;
+/**
+ * Two position samples further apart than this say nothing about whether
+ * playback progressed in between: the gap is unknown, not a freeze. Players
+ * sample position every few seconds while playing; a longer silence is the
+ * sampler, not the video.
+ */
+const PROGRESS_MAX_GAP_MS = 10_000;
 
 interface MinuteAcc {
   intentMs: number;
@@ -491,6 +498,13 @@ export class MinuteCompiler {
       this.lastPosition = null;
       return;
     }
+    if (this.lastPosition !== null && t - this.lastProgressAt > PROGRESS_MAX_GAP_MS) {
+      this.lastPosition = null;
+      if (this.progressStall > 0) {
+        this.progressStall = 0;
+        this.progressEpisode++;
+      }
+    }
     if (this.lastPosition !== null) {
       const wall = t - this.lastProgressAt;
       const pos = positionMs - this.lastPosition;
@@ -568,6 +582,9 @@ export class MinuteCompiler {
       const completed = i.duration_asset_ms !== null && i.maxPositionMs >= 0.98 * i.duration_asset_ms;
       this.closeInterval(input.t, completed ? "COMPLETED" : "SWITCHED");
     }
+    // A new asset has its own position timeline; progress tracking restarts.
+    this.lastPosition = null;
+    this.progressStall = 0;
     this.asset = {
       id: input.asset_id,
       type: input.asset_type,
