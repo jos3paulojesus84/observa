@@ -1,0 +1,13 @@
+{
+  "name": "@observa/minute-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minute Explorer: the QoE Explorer's analytics workflows, rebuilt on minute records.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}

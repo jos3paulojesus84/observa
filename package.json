@@ -1,0 +1,14 @@
+{
+  "name": "observa",
+  "private": true,
+  "description": "Streaming Experience Observability: one minute of video, from player to population.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @observa/core && npm run build -w @observa/minute-explorer",
+    "test": "npm test -w @observa/core",
+    "typecheck": "npm run typecheck -w @observa/core"
+  }
+}
