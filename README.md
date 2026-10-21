@@ -39,7 +39,14 @@ The tests replay the data-flow document's 12:11 minute from its stage-01 event l
 
 ### Minute Explorer
 
-The QoE Explorer's analytics workflows, rebuilt on the minute record. The triage findings and alerts, scope filters and conditions, metric cards with drag-to-slice, previous-period compare, pinned values, separate and combined breakdowns, and the viewer roll-up all behave as before; what changed is the unit underneath them.
+The QoE Explorer's analytics workflows, rebuilt on the minute record. Alerts and findings, scope filters and conditions, metric cards with drag-to-slice, previous-period compare, pinned values, separate and combined breakdowns, and the viewer roll-up all behave as before; what changed is the unit underneath them.
+
+- **The headline is three widgets.**
+  - *Audience*: playing time, ad impressions, minutes or active users, broken down by any dimension. The additive metrics draw as a treemap filling to 100%, with tile area the share and tile colour that value's issue-free minutes against the objective. Active users is a unique count (§4.2), so values overlap: it draws as lines with an estimated total. Clicking a tile filters the page, ＋ pins the value for compare on the cards. Playbacks, concurrent playbacks and active users sit under it, each with ＋ to make it a card.
+  - *Minutes*: issue-free against with issues.
+  - *Components*: the components that compose the minutes.
+- **Cards are the compare surface.** Previous period and pinned values need one metric per chart, so the cards open on the metrics people compare: issue-free minutes, the main components, start success, startup time, bitrate and time at peak.
+- **Anomalies have their own page.** Every alert and finding over 24 hours or 7 days is one anomaly, keyed by metric and cohort rather than firing time, so a re-trigger is an occurrence of the same anomaly. Each has a status (new, acknowledged, investigating, resolved, muted), an owner and a comment thread. "Explain in Explorer" opens the Explorer scoped to it, with a way back. The bell lists the open anomalies still firing. Published, the statuses and comments live in the artifact's shared database; opened as a local file they stay in the browser.
 
 - **The headline is minutes.** % issue-free minutes (or % minutes with issues) with the minute counts beside it, against an objective and burn rate. Content and ad minutes are scored separately (§3.4); an optional switch weights minutes by intent seconds, as §4 defines Issue-Free Opportunity.
 - **It is composed of components.** The out-of-the-box components are the §6.2 issue bits set on the device. Custom components are a customer's own thresholds on fields every minute record carries (rebuffer time, rebuffer count, startup time, delivered bitrate, time at peak rendition, freeze time), evaluated server-side at bucket resolution (§13.3), so they apply to history too. A minute with issues is the union of the switched-on components. Each component is a metric: a card, a table column, a finding, a drill.

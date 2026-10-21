@@ -348,8 +348,48 @@ button{font:inherit; color:inherit; background:none; border:0; cursor:pointer}
    of the split — its own legend, directly under the series it switches. One
    shared legend under two charts meant the control for a line sat a long way
    from the line. */
-.kpi-grid{display:grid; grid-template-columns:1.45fr 1fr; gap:12px; align-items:stretch}
+/* Three widgets: who (audience), how it went (minutes), and what broke
+   (components). Under 1280px the audience takes its own row above the pair. */
+.kpi-grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.12fr) minmax(0,1fr); gap:12px; align-items:stretch}
+@media (max-width:1280px){ .kpi-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .kpi-grid .aud{grid-column:1 / -1} }
 @media (max-width:900px){ .kpi-grid{grid-template-columns:1fr} }
+.aud-ctl{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:6px 0 6px}
+.aud-ctl .lbl{font-size:11px; color:var(--text-faint)}
+.aud-ctl select{max-width:150px}
+.aud-raw{font-family:var(--font-mono); font-size:10px; color:var(--warn); margin-top:4px}
+.aud-tree{position:relative; flex:1 1 auto; min-height:210px; margin:2px 14px 0}
+.aud-tree .tile{position:absolute; box-sizing:border-box; border:2px solid var(--panel); border-radius:7px;
+  background:color-mix(in oklab, var(--tc) 36%, var(--panel)); box-shadow:inset 0 3px 0 var(--tc);
+  padding:6px 7px 4px; overflow:hidden; cursor:pointer; display:flex; flex-direction:column; gap:1px;
+  font-size:11.5px; line-height:1.25; transition:background .12s}
+.aud-tree .tile:hover{background:color-mix(in oklab, var(--tc) 50%, var(--panel))}
+.aud-tree .tile.on{box-shadow:inset 0 3px 0 var(--tc), inset 0 0 0 2px var(--accent)}
+.aud-tree .tile.pinned{box-shadow:inset 0 3px 0 var(--tc), inset 0 0 0 2px var(--pc)}
+.aud-tree .tile.dim{opacity:.42}
+.aud-tree .tile.other{cursor:default; background:color-mix(in oklab, var(--tc) 14%, var(--panel-2))}
+.aud-tree .tn{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:16px}
+.aud-tree .tv, .aud-tree .tf{font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums}
+.aud-tree .tp{position:absolute; top:3px; right:3px; font-size:13px; font-weight:600; line-height:1;
+  padding:2px 4px; border-radius:5px; color:var(--text-dim); opacity:.7}
+.aud-tree .tp:hover, .aud-tree .tp.on{opacity:1; color:var(--accent); background:var(--panel)}
+.aud-scale{display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:7px 16px 4px;
+  font-family:var(--font-mono); font-size:10px; color:var(--text-faint)}
+.aud-scale i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:-5px}
+.kpi-row.aud-row{grid-template-columns:12px minmax(80px,1fr) 44px 62px 20px 44px}
+.aud-row .nm{text-align:left; padding:0; color:inherit; font:inherit}
+.aud-row .nm:hover{color:var(--accent)}
+.aud-row .fr{font-family:var(--font-mono); font-size:10.5px; text-align:right}
+.aud-vol{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); border-top:1px solid var(--border-soft); margin-top:auto}
+.aud-vol .av{position:relative; padding:8px 14px 9px; display:flex; flex-direction:column; gap:1px; min-width:0}
+.aud-vol .av + .av{border-left:1px solid var(--border-soft)}
+.aud-vol .avl{font-family:var(--font-mono); font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:16px}
+.aud-vol .avn{font-family:var(--font-mono); font-size:16px; font-variant-numeric:tabular-nums}
+.aud-vol .avd{font-family:var(--font-mono); font-size:10px; color:var(--text-faint)}
+.aud-vol .addc{position:absolute; top:6px; right:8px; font-size:14px; font-weight:600; color:var(--text-faint);
+  padding:1px 3px; border-radius:5px; opacity:.6; cursor:pointer}
+.aud-vol .addc:hover, .aud-vol .addc.on{opacity:1; color:var(--accent)}
 /* overflow:hidden is not cosmetic here. The chart svg is overflow:visible so
    its axis labels can breathe, and the panel has rounded corners — without a
    clip on the card, a full-bleed chart paints square corners over the radius
@@ -988,9 +1028,9 @@ details.mrec-wire summary:hover{color:var(--text-dim)}
   <section class="cell" id="cell-kpi">
     <div class="cell-head">
       <span class="eyebrow">Headline</span>
-      <h2>Minutes</h2>
+      <h2>Audience and minutes</h2>
       <div class="kpictl" id="kpictl"></div>
-      <span class="hint">Click a component to break the page down by it · the share and the minute count always travel together</span>
+      <span class="hint">Click a tile to filter, <b>＋</b> to compare it on the cards · click a component to break the page down by it · the share and the minute count always travel together</span>
     </div>
     <div id="kpi"></div>
   </section>
@@ -1120,6 +1160,15 @@ const METRICS = {
   concurrent:  {label:"Concurrent playbacks",fmt:"int", dir:"up", grp:"Volume", src:"session"},
   watchmin:    {label:"Active minutes",      fmt:"min", dir:"up", grp:"Volume", src:"session"},
 
+  /* ── audience: who and how much, for the Audience widget. Playing time and
+     ad impressions add up across values; active users is a unique count
+     (§4.2, a sketch), so values of one dimension overlap and never sum to the
+     total. ── */
+  playtime:    {label:"Playing time",        fmt:"hrs", dir:"up", grp:"Audience", src:"session"},
+  adimps:      {label:"Ad impressions",      fmt:"int", dir:"up", grp:"Audience", src:"session"},
+  activeusers: {label:"Active users",        fmt:"int", dir:"up", grp:"Audience", src:"session", unique:true,
+                note:"unique, estimated from a sketch"},
+
   /* ── acquisition: attempts, not minutes (§3.3). A failed start may produce no
      minute at all, so it can never live only inside the minute headline. ── */
   attempts:     {label:"Playback attempts",      fmt:"int", dir:"up",   grp:"Acquisition", src:"session"},
@@ -1163,10 +1212,13 @@ rebuildUnits();
 const unitize = m => (S.unit === "count" ? UNIT_COUNT[m] : UNIT_PCT[m]) || m;
 const uniq = a => a.filter((v, i) => a.indexOf(v) === i);
 
-/* The headline widget owns the minute story, so the cards are free to carry
-   volume, acquisition and delivered quality. */
-const DEFAULT_METRICS = ["viewercount","concurrent","eligmin","startsuccess","latency",
-                         "qbrbitrate","completeness"];
+/* The headline widgets are the overview: the minutes, the components that
+   compose them, and the audience they fell on. The cards are where a metric
+   is compared, against the previous period or across pinned values, which
+   takes one metric per chart, so they open on the metrics people compare
+   rather than on volume, which now lives in the Audience widget. */
+const DEFAULT_METRICS = ["issuefree","pm_rebuffer","pm_startup","pm_playerr","startsuccess","latency",
+                         "qbrbitrate","peakshare"];
 
 /* Dimensions. Client-observable ones travel in the context dictionary;
    server-derived ones (ISP, ASN, geography, CDN) are resolved at ingest and
@@ -1350,6 +1402,7 @@ const S = {
   tok: {kpi:0, cards:0, multi:0, tables:[0,0,0], sess:0},   // each loader invalidates only its own section
   hoverT: null,
   kpiOff: {},                        // bands taken out of the opportunity stack
+  aud: {metric:"playtime", dim:"device", view:"tree", data:null, err:null, loading:true, tok:0},
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1530,12 +1583,13 @@ function fmt(key, v, opt){
     /* A count of minute records. dur() would escalate to hours and days,
        which is right for one playback and absurd for an aggregate. */
     case "min":   return compact(v) + (tight ? "" : " min");
+    case "hrs":   return compact(v) + (tight ? "" : " h");
     default:      return tight ? compact(v) : compact(v);
   }
 }
 function unitOf(key){
   const f = (METRICS[key] || {}).fmt;
-  return f === "mbps" ? "Mbps" : f === "min" ? "min" : "";
+  return f === "mbps" ? "Mbps" : f === "min" ? "min" : f === "hrs" ? "h" : "";
 }
 const HH = t => new Date(t*1000).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
 const DAY = t => new Date(t*1000).toLocaleDateString(undefined,{day:"numeric",month:"short"});
@@ -2016,6 +2070,11 @@ const DEMO = (() => {
         case "viewercount": put(m, Math.round(plays)); break;
         case "concurrent":  put(m, Math.round(minutes / Math.max(1, span / 60))); break;
         case "watchmin":    put(m, Math.round(elig * .93 * recv)); break;
+        case "playtime":    put(m, minutes * recv * .97 / 60); break;
+        // two 30-second spots per ad minute, with ad load varying by cohort
+        case "adimps":      put(m, Math.round(minutes * AD_SHARE * 2 * recv * jt(.35, "adl"))); break;
+        // a viewer starts more than one playback, more so over a longer window
+        case "activeusers": put(m, Math.round(plays / (1 + .32 * Math.log2(1 + span / 3600)))); break;
         case "attempts":    put(m, Math.round(attempts)); break;
         case "startsuccess":put(m, clamp(100 - (lv.fail||0) * jt(.08, "fail") - (lv.aband||0) * .35, 0, 100)); break;
         case "startfail":   put(m, Math.round(attempts * failS)); break;
@@ -2044,6 +2103,9 @@ const DEMO = (() => {
     return {lane: kd.lane || "content", weight: kd.weight || "minutes", active: kd.active || [], fam: kd.fam || {},
             custom: kd.custom || []};
   }
+  const USER_OVERLAP = {cdn:1.22, isp:1.05, asn:1.06, device:1.03, platform:1.03, tier:1.02, appversion:1.02,
+                        player:1.01, assetname:1.55, subpropertyid:1.3, contentprovider:1.2, contenttype:1.18,
+                        mediatype:1.1, city:1.03, region:1.01, country:1.005};
   function minuteMetricsTool(input){
     const [a, b] = String(input.period || "").split(",").map(Number);
     const w = {start: a, end: b};
@@ -2087,6 +2149,12 @@ const DEMO = (() => {
         for (let t = t0; t < w.end; t += step) if (t + step > w.start) emit(g, key, t, t + step);
       } else emit(g, key, w.start, w.end);
     });
+    /* Unique viewers are a sketch merge, not a sum (§4.2): split by a
+       dimension, a viewer who moved between values counts once in each. */
+    if (dims.length && ms.includes("activeusers")){
+      const ov = dims.reduce((a, d) => a * (USER_OVERLAP[d] || 1.04), 1);
+      rows.forEach(r => { if (r.activeusers != null) r.activeusers = Math.round(r.activeusers * ov); });
+    }
     const p = {response: rows, totalrecords: rows.length, totalcount: rows.length, pagecount: 1};
     // §8.6: below cube granularity the query falls through to the raw minute tier.
     if (dims.some(d => isRawDim(d)) || Object.keys(fl).some(d => isRawDim(d))) p._tier = "raw";
@@ -2592,6 +2660,7 @@ const kpiMetrics = () => ["issuefree","issuemin","eligmin","viewercount"].concat
 async function loadKpi(quiet){
   const tok = ++S.tok.kpi, w = win();
   S.err.kpi = null;
+  loadAud(quiet);
   if (!quiet || !S.data.kpi){ S.loading.kpi = true; renderKpi(); }
   try {
     const f = baseFilter(), list0 = kpiMetrics(), ms = list0.join(",");
@@ -2774,8 +2843,10 @@ function renderKpi(){
   if (S.err.kpi){ host.innerHTML = defBox + errNote(S.err.kpi, "the headline"); return; }
   if (S.loading.kpi && !S.data.kpi){
     host.innerHTML = defBox + `<div class="kpi-grid">
+      <div class="panel kpi-w aud" id="aud"></div>
       <div class="panel"><div style="padding:14px"><div class="skel" style="height:240px"></div></div></div>
       <div class="panel"><div style="padding:14px"><div class="skel" style="height:240px"></div></div></div></div>`;
+    renderAud();
     return;
   }
   const d = S.data.kpi;
@@ -2826,6 +2897,7 @@ function renderKpi(){
   };
 
   host.innerHTML = defBox + `<div class="kpi-grid">
+    <div class="panel kpi-w aud" id="aud"></div>
     <div class="panel kpi-w">
       <div class="kpi-wh">
         <div class="k">${esc(laneWord)}Minutes · stacked, sums to eligible minutes</div>
@@ -2865,6 +2937,7 @@ function renderKpi(){
   const lineBox = document.getElementById("kpilines");
   if (lineBox && rows.length && comps.some(c => !S.kpiOff[c.k])) drawKpiChart(lineBox, rows, w, "lines");
   else if (lineBox) lineBox.innerHTML = `<div class="cnote">${comps.length ? "Every component hidden." : ""}</div>`;
+  renderAud();
   renderKpiHead();
 }
 
@@ -2880,6 +2953,314 @@ function renderKpiHead(){
     <button class="btn ${S.kdefOpen ? "on" : ""}" id="kdefbtn" aria-expanded="${!!S.kdefOpen}"
       title="Choose which components make a minute count as having issues">
       Definition · ${n} component${n === 1 ? "" : "s"}${nc ? " · " + nc + " custom" : ""} <i class="car">▾</i></button>`;
+}
+
+/* ── the audience widget ─────────────────────────────────────────────
+   Who the minutes fell on, beside the minutes themselves. Playing time, ad
+   impressions and minutes add up across the values of a dimension, so they
+   draw as a treemap that fills to 100%: tile area is the metric, tile colour
+   is that value's issue-free share, which is what makes a large, unhealthy
+   cohort stand out. Active users is a unique count (§4.2): a viewer who moved
+   between two CDNs is one viewer in the total and one in each CDN, so it has
+   no 100% to fill and only draws as lines. */
+const AUD_METRICS = [
+  {k:"playtime",    l:"Playing time"},
+  {k:"adimps",      l:"Ad impressions"},
+  {k:"eligmin",     l:"Minutes"},
+  {k:"activeusers", l:"Active users"},
+];
+const AUD_VOLUME = ["viewercount", "concurrent", "activeusers"];
+const AUD_TOP = 9, AUD_LINES = 5;
+/* The widget's own choices are a per-viewer convenience, like the definition. */
+function saveAud(){
+  try { localStorage.setItem("minute-explorer:aud", JSON.stringify({metric:S.aud.metric, dim:S.aud.dim, view:S.aud.view})); } catch (e) { /* per-viewer only */ }
+}
+try {
+  const a = JSON.parse(localStorage.getItem("minute-explorer:aud") || "null");
+  if (a){
+    if (AUD_METRICS.some(x => x.k === a.metric)) S.aud.metric = a.metric;
+    if (DIMS.some(x => x.k === a.dim)) S.aud.dim = a.dim;
+    if (a.view === "tree" || a.view === "lines") S.aud.view = a.view;
+  }
+} catch (e) { /* per-viewer only */ }
+const audUnique = () => !!(METRICS[S.aud.metric] || {}).unique;
+const audView = () => audUnique() ? "lines" : S.aud.view;
+
+async function loadAud(quiet){
+  const A = S.aud, tok = ++A.tok, w = win(), m = A.metric, dim = A.dim;
+  A.err = null;
+  if (!quiet || !A.data){ A.loading = true; renderAud(); }
+  try {
+    /* The tiles keep every value of their own dimension in view, so a click
+       highlights its value instead of collapsing the map to one tile. */
+    const f = facetFilter(dim), prevW = {start: w.start - w.len, end: w.end - w.len};
+    const vol = uniq([m].concat(AUD_VOLUME)).join(",");
+    const [by, tot, prev] = await Promise.all([
+      limit(() => callTool("query_minute_metrics", args({
+        metrics: m + ",issuefree", period: periodOf(w), aggby: dim, filter: f}))),
+      limit(() => callTool("query_minute_metrics", args({
+        metrics: vol, period: periodOf(w), aggby: "", filter: baseFilter()}))),
+      limit(() => callTool("query_minute_metrics", args({
+        metrics: vol, period: periodOf(prevW), aggby: "", filter: baseFilter()}))).catch(() => null),
+    ]);
+    if (tok !== A.tok) return;
+    const vals = rows_(by).map(r => ({v: unesc(String(r[dim] == null ? "" : r[dim])), n: +r[m] || 0,
+                                      free: r.issuefree == null ? null : +r.issuefree}))
+      .filter(r => r.n > 0).sort((a, b) => b.n - a.n);
+    let series = null;
+    if (audView() === "lines" && vals.length){
+      const top = vals.slice(0, AUD_LINES).map(r => r.v);
+      const ser = await limit(() => callTool("query_minute_metrics", args({
+        metrics: m, period: periodOf(w), aggby: "timestamp," + dim, granularity: S.gran,
+        filter: pinFilter(dim, top)})));
+      if (tok !== A.tok) return;
+      series = groupSeries(rows_(ser), m, dim);
+    }
+    A.data = {m, dim, vals, series, tot: rows_(tot)[0] || {}, prev: prev ? (rows_(prev)[0] || null) : null, w};
+  } catch (e) {
+    if (e && e.code === "cancelled") return;
+    A.err = e; A.data = null;
+  }
+  A.loading = false;
+  renderAud();
+}
+
+/* Squarified treemap (Bruls, Huizing, van Wijk): rows of tiles laid along the
+   shorter side, each row closed when adding a tile would worsen its aspect. */
+function squarify(items, x, y, w, h){
+  const out = [], total = items.reduce((a, r) => a + r.n, 0);
+  if (!(total > 0)) return out;
+  const scale = w * h / total;
+  let rest = items.map(r => ({r, a: r.n * scale}));
+  const worst = (row, side) => {
+    const s = row.reduce((a, q) => a + q.a, 0);
+    let hi = 0, lo = Infinity;
+    row.forEach(q => { hi = Math.max(hi, q.a); lo = Math.min(lo, q.a); });
+    return Math.max(side * side * hi / (s * s), (s * s) / (side * side * lo));
+  };
+  while (rest.length){
+    const side = Math.min(w, h);
+    let row = [rest[0]], i = 1;
+    while (i < rest.length && worst(row.concat(rest[i]), side) <= worst(row, side)) row.push(rest[i++]);
+    rest = rest.slice(i);
+    const s = row.reduce((a, q) => a + q.a, 0);
+    if (w >= h){
+      const cw = s / h; let cy = y;
+      row.forEach(q => { const ch = q.a / cw; out.push({r: q.r, x, y: cy, w: cw, h: ch}); cy += ch; });
+      x += cw; w -= cw;
+    } else {
+      const ch = s / w; let cx = x;
+      row.forEach(q => { const cw = q.a / ch; out.push({r: q.r, x: cx, y, w: cw, h: ch}); cx += cw; });
+      y += ch; h -= ch;
+    }
+  }
+  return out;
+}
+
+/* Colour reads against the objective the way burn does: at or under budget is
+   good, twice the budget or worse is critical. */
+function freeColor(free){
+  if (free == null) return "var(--text-faint)";
+  const burn = Math.max(0, 100 - free) / Math.max(.01, 100 - OBJECTIVE.target);
+  if (burn <= 1) return `color-mix(in oklab, var(--good) ${Math.round(100 - burn * 45)}%, var(--warn))`;
+  const t = Math.min(1, burn - 1);
+  return `color-mix(in oklab, var(--warn) ${Math.round(100 - t * 100)}%, var(--crit))`;
+}
+
+function audHeadHTML(){
+  const A = S.aud, view = audView(), uni = audUnique();
+  const dims = DIMS.map(d => `<option value="${d.k}" ${d.k === A.dim ? "selected" : ""}>${esc(d.l)}${d.raw ? " · raw tier" : ""}</option>`).join("");
+  return `<div class="aud-ctl">
+      <select id="audmetric" aria-label="Audience metric">${AUD_METRICS.map(x =>
+        `<option value="${x.k}" ${x.k === A.metric ? "selected" : ""}>${esc(x.l)}</option>`).join("")}</select>
+      <span class="lbl">by</span>
+      <select id="auddim" aria-label="Break down by">${dims}</select>
+      <div class="seg" role="group" aria-label="View">
+        <button data-audview="tree" aria-pressed="${view === "tree"}" ${uni ? "disabled" : ""}
+          title="${uni ? "Active users is a unique count: values overlap, so there is no 100% to fill" : "Shares of the total, coloured by issue-free minutes"}">Treemap</button>
+        <button data-audview="lines" aria-pressed="${view === "lines"}" title="The top values over time">Lines</button></div>
+    </div>`;
+}
+
+function renderAud(){
+  const host = document.getElementById("aud");
+  if (!host) return;
+  const A = S.aud, d = A.data, m = A.metric;
+  const label = (AUD_METRICS.find(x => x.k === m) || {l: m}).l;
+  const top = `<div class="kpi-wh">
+      <div class="k">Audience · ${audView() === "tree" ? "share of the total" : "top values over time"}</div>
+      ${audHeadHTML()}`;
+  if (A.err){ host.innerHTML = top + `</div>` + errNote(A.err, "the audience"); return; }
+  if (!d){ host.innerHTML = top + `</div><div style="padding:0 14px 14px"><div class="skel" style="height:220px"></div></div>`; return; }
+  const uni = audUnique(), T = d.tot;
+  const total = T[m] == null ? d.vals.reduce((a, r) => a + r.n, 0) : +T[m];
+  const sum = d.vals.reduce((a, r) => a + r.n, 0);
+  const sel = S.filters[d.dim] || [];
+  const dimL = /^[A-Z]{2,}/.test(dimLabel(d.dim)) ? dimLabel(d.dim) : dimLabel(d.dim).toLowerCase();
+  const sub = uni
+    ? `est. <b>${esc(fmt(m, total))}</b> unique in the window · a viewer seen on more than one ${esc(dimL)} counts in each,
+       so the values sum to ${esc(fmt(m, sum))}, not the total`
+    : audView() === "tree"
+      ? `across ${d.vals.length} ${esc(dimL)} value${d.vals.length === 1 ? "" : "s"} · a tile's area is its share, its colour how its minutes went`
+      : `across ${d.vals.length} ${esc(dimL)} value${d.vals.length === 1 ? "" : "s"} · the top ${Math.min(AUD_LINES, d.vals.length)} over time`;
+  const raw = isRawDim(d.dim) ? `<div class="aud-raw">${esc(dimLabel(d.dim))} is not in the minute cube (§5.2): read from the raw minute tier (§8.6)</div>` : "";
+
+  let body;
+  if (!d.vals.length) body = `<div class="kpi-none" style="padding:16px">No ${esc(label.toLowerCase())} in this window.</div>`;
+  else if (audView() === "tree") body = `<div class="aud-tree" id="audtree"></div>
+      <div class="aud-scale"><span>issue-free</span><i style="background:${freeColor(100)}"></i>within objective
+        <i style="background:${freeColor(OBJECTIVE.target - (100 - OBJECTIVE.target) * .5)}"></i>1.5× budget
+        <i style="background:${freeColor(OBJECTIVE.target - (100 - OBJECTIVE.target) * 1.2)}"></i>2× or worse</div>`;
+  else {
+    const top = d.vals.slice(0, AUD_LINES);
+    body = `<div class="kpi-chart chartbox aud-lines" id="audlines"></div>
+      <div class="kpi-read multi" data-rest="hover to read a bucket · drag to slice the page">hover to read a bucket · drag to slice the page</div>
+      <div class="kpi-legend">${top.map((r, i) => audRow(r, i, total, uni, sel)).join("")}</div>`;
+  }
+  host.innerHTML = top + `<span class="n">${esc((uni ? "≈ " : "") + fmt(m, total))}</span>
+      <span class="kpi-what">${esc(label.toLowerCase())}</span>
+      <div class="sub">${sub}</div>${raw}</div>${body}${audVolumeHTML(d)}`;
+  if (audView() === "tree") drawAudTree(document.getElementById("audtree"), d, total, sel);
+  else drawAudLines(document.getElementById("audlines"), d);
+}
+
+const AUD_LINE_C = ["--s1","--s2","--s3","--s4","--s5"];
+function audRow(r, i, total, uni, sel){
+  const pin = pinOf(S.aud.dim, r.v), on = sel.includes(r.v);
+  return `<div class="kpi-row aud-row ${sel.length && !on ? "off" : ""}">
+    <i class="sw" style="background:var(${AUD_LINE_C[i]})"></i>
+    <button class="nm" data-audf="${esc(r.v)}" title="${on ? "Remove this filter" : "Filter the page to " + esc(r.v)}">${esc(r.v)}</button>
+    <span class="pc">${uni ? "" : esc((total > 0 ? r.n / total * 100 : 0).toFixed(1) + "%")}</span>
+    <span class="ab">${esc(fmt(S.aud.metric, r.n))}</span>
+    <span class="addc ${pin ? "on" : ""}" data-audpin="${esc(r.v)}" role="button"
+      title="${pin ? "Stop comparing " + esc(r.v) : "Compare " + esc(r.v) + " on the cards below"}">${pin ? "−" : "＋"}</span>
+    <span class="fr" style="color:${freeColor(r.free)}" title="issue-free minutes">${r.free == null ? "" : esc(r.free.toFixed(1) + "%")}</span>
+  </div>`;
+}
+
+function drawAudTree(box, d, total, sel){
+  if (!box) return;
+  const W = Math.max(160, box.clientWidth), H = Math.max(150, box.clientHeight || 220);
+  const items = d.vals.slice(0, AUD_TOP);
+  const restN = Math.max(0, d.vals.slice(AUD_TOP).reduce((a, r) => a + r.n, 0));
+  if (restN > 0){
+    const rest = d.vals.slice(AUD_TOP);
+    const wsum = rest.reduce((a, r) => a + (r.free == null ? 0 : r.n), 0);
+    items.push({v: null, n: restN, other: rest.length,
+                free: wsum ? rest.reduce((a, r) => a + (r.free == null ? 0 : r.free * r.n), 0) / wsum : null});
+  }
+  const tiles = squarify(items, 0, 0, W, H);
+  const m = d.m;
+  box.innerHTML = tiles.map(t => {
+    const r = t.r, share = total > 0 ? r.n / total * 100 : 0;
+    const name = r.v == null ? `${r.other} more` : r.v;
+    const on = r.v != null && sel.includes(r.v), dim = sel.length && !on;
+    const pin = r.v != null ? pinOf(d.dim, r.v) : null;
+    const big = t.w > 74 && t.h > 40, mid = t.w > 44 && t.h > 22;
+    const c = freeColor(r.free);
+    return `<div class="tile ${on ? "on" : ""} ${dim ? "dim" : ""} ${pin ? "pinned" : ""} ${r.v == null ? "other" : ""}"
+        style="left:${(t.x / W * 100).toFixed(3)}%;top:${(t.y / H * 100).toFixed(3)}%;width:${(t.w / W * 100).toFixed(3)}%;height:${(t.h / H * 100).toFixed(3)}%;--tc:${c}${pin ? ";--pc:var(" + pin.color + ")" : ""}"
+        ${r.v == null ? "" : `data-audf="${esc(r.v)}" role="button" tabindex="0"`}
+        title="${esc(name)} · ${esc(fmt(m, r.n))} · ${share.toFixed(1)}% of the total · ${r.free == null ? "no eligible minutes" : r.free.toFixed(2) + "% issue-free"}${r.v == null ? "" : " · click to filter"}">
+      ${mid ? `<span class="tn">${esc(name)}</span>` : ""}
+      ${big ? `<span class="tv">${share.toFixed(share >= 10 ? 0 : 1)}% · ${esc(fmt(m, r.n))}</span>
+               <span class="tf">${r.free == null ? "" : esc(r.free.toFixed(1) + "% issue-free")}</span>` : ""}
+      ${r.v != null && t.w > 30 && t.h > 22 ? `<span class="tp ${pin ? "on" : ""}" data-audpin="${esc(r.v)}" role="button"
+        title="${pin ? "Stop comparing" : "Compare on the cards below"}">${pin ? "−" : "＋"}</span>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function drawAudLines(box, d){
+  if (!box || !d.series) return;
+  const w = d.w, top = d.vals.slice(0, AUD_LINES);
+  const W = Math.max(200, box.clientWidth), H = Math.max(150, box.clientHeight || 196), padT = 14, padB = 18;
+  const lines = top.map((r, i) => ({v: r.v, c: AUD_LINE_C[i], pts: d.series.get(r.v) || []}));
+  const hi = Math.max(1e-6, Math.max.apply(null, lines.map(l => Math.max.apply(null, l.pts.map(p => p.v).concat(0)))) * 1.12);
+  const x = t => Math.max(0, Math.min(1, (t - w.start) / w.len)) * (W - 2) + 1;
+  const y = v => padT + (1 - v / hi) * (H - padT - padB);
+  const y0 = H - padB;
+  let g = `<line x1="0" y1="${y0}" x2="${W}" y2="${y0}" stroke="var(--grid)"/>`
+        + `<line x1="0" y1="${padT}" x2="${W}" y2="${padT}" stroke="var(--grid)" stroke-dasharray="2 3"/>`
+        + `<text x="1" y="${padT - 4}" class="kx">${esc(fmt(d.m, hi))}</text>`
+        + `<text x="1" y="${y0 + 12}" class="kx">0</text>`
+        + `<text x="${W - 1}" y="${y0 + 12}" class="kx" text-anchor="end">${esc(HH(w.end))}</text>`
+        + `<text x="${W / 2}" y="${y0 + 12}" class="kx" text-anchor="middle">${esc(HH(w.start + w.len / 2))}</text>`;
+  lines.forEach(l => {
+    if (l.pts.length < 2) return;
+    g += `<path d="${l.pts.map((p, n) => (n ? "L" : "M") + x(p.t).toFixed(1) + " " + y(p.v).toFixed(1)).join(" ")}"
+      fill="none" stroke="var(${l.c})" stroke-width="1.8" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+  });
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+      aria-label="${esc(METRICS[d.m].label)} by ${esc(dimLabel(d.dim))} over ${esc(w.label)}">
+      <style>.kx{font-family:var(--font-mono);font-size:9px;fill:var(--text-faint);
+        paint-order:stroke;stroke:var(--panel);stroke-width:3px}</style>
+      <g class="brs"></g>${g}<g class="khov"></g>
+      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" class="khit" style="cursor:crosshair"/></svg>`;
+  const svg = box.querySelector("svg"), hov = box.querySelector(".khov"), brs = box.querySelector(".brs");
+  const read = box.closest(".kpi-w").querySelector(".kpi-read");
+  const ts = [...new Set([].concat(...lines.map(l => l.pts.map(p => p.t))))].sort((a, b) => a - b);
+  box._draw = t => {
+    if (t == null || drag.on || !ts.length){ hov.innerHTML = ""; if (read) read.innerHTML = read.dataset.rest; return; }
+    const best = ts.reduce((a, q) => Math.abs(q - t) < Math.abs(a - t) ? q : a, ts[0]);
+    hov.innerHTML = `<line x1="${x(best).toFixed(1)}" y1="${padT}" x2="${x(best).toFixed(1)}" y2="${y0}"
+      stroke="var(--text-faint)" stroke-width="1" stroke-dasharray="2 2"/>`;
+    if (read) read.innerHTML = `<span class="at">${esc(HH(best))}</span>` + lines.map(l => {
+      const p = l.pts.find(q => q.t === best);
+      return `<span><i class="sw" style="background:var(${l.c})"></i>${esc(l.v)} ${esc(p ? fmt(d.m, p.v) : "–")}</span>`;
+    }).join("");
+  };
+  box._brush = (a, b2) => {
+    if (a == null || b2 == null){ brs.innerHTML = ""; return; }
+    const xa = x(Math.min(a, b2)), xb = x(Math.max(a, b2));
+    brs.innerHTML = `<rect x="${xa.toFixed(1)}" y="${padT - 4}" width="${Math.max(1, xb - xa).toFixed(1)}"
+      height="${(y0 - padT + 4).toFixed(1)}" fill="var(--accent-soft)" stroke="var(--accent-line)" stroke-width="1"/>`;
+  };
+  const hit = box.querySelector(".khit");
+  const at = ev => {
+    const r = svg.getBoundingClientRect(), frac = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    return {t: w.start + frac * w.len, px: frac * W};
+  };
+  hit.addEventListener("mousedown", ev => {
+    if (ev.button !== 0) return;
+    const a = at(ev);
+    drag = {on:true, t0:a.t, t1:a.t, px0:a.px, px1:a.px, metric:"issuemin", w};
+    ev.preventDefault();
+  });
+  hit.addEventListener("mousemove", ev => {
+    const a = at(ev); setHover(a.t);
+    if (drag.on){ drag.t1 = a.t; drag.px1 = a.px; setBrushPreview(drag.t0, drag.t1); }
+  });
+  hit.addEventListener("mouseleave", () => { if (!drag.on) setHover(null); });
+  if (S.hoverT != null) box._draw(S.hoverT);
+  if (S.brush) box._brush(S.brush.start, S.brush.end);
+}
+
+document.addEventListener("keydown", ev => {
+  const t = ev.target;
+  if ((ev.key === "Enter" || ev.key === " ") && t.classList && t.classList.contains("tile") && t.hasAttribute("data-audf")){
+    ev.preventDefault(); t.click();
+  }
+});
+
+/* The volume figures that used to open the card strip. Each still goes onto
+   the cards with ＋ when it needs a chart of its own. */
+function audVolumeHTML(d){
+  const T = d.tot, P = d.prev || {};
+  return `<div class="aud-vol">${AUD_VOLUME.map(k => {
+    const v = T[k] == null ? null : +T[k], p = P[k] == null ? null : +P[k];
+    const ch = v != null && p ? (v - p) / p * 100 : null;
+    const on = S.metrics.includes(k);
+    const lbl = k === "concurrent" ? "Concurrent" : METRICS[k].label;
+    const qual = k === "concurrent" ? "mean · " : k === "activeusers" ? "est. · " : "";
+    return `<div class="av">
+      <span class="avl">${esc(lbl)}</span>
+      <span class="avn">${esc(fmt(k, v))}</span>
+      <span class="avd">${esc(qual)}${ch == null ? "" : `${ch >= 0 ? "+" : ""}${ch.toFixed(1)}% vs prev.`}</span>
+      <span class="addc ${on ? "on" : ""}" data-kadd="${k}" role="button"
+        title="${on ? "Remove from the cards below" : "Add as a card below, to compare it"}">${on ? "−" : "＋"}</span>
+    </div>`;
+  }).join("")}</div>`;
 }
 
 /* ── the definition editor ─────────────────────────────────────────── */
@@ -5935,6 +6316,17 @@ document.addEventListener("click", ev => {
     renderCards(); loadBreakdowns(); return;
   }
   if (hit("#addmetric")) return metricPop(hit("#addmetric"));
+  b = hit("[data-audpin]"); if (b){
+    ev.stopPropagation();
+    togglePin(S.aud.dim, b.getAttribute("data-audpin"));
+    return renderAud();
+  }
+  b = hit("[data-audf]"); if (b){ toggleFilter(S.aud.dim, b.getAttribute("data-audf")); return renderAud(); }
+  b = hit("[data-audview]"); if (b){
+    if (b.disabled || S.aud.view === b.getAttribute("data-audview")) return;
+    S.aud.view = b.getAttribute("data-audview"); saveAud();
+    return loadAud();
+  }
   b = hit("[data-kadd]"); if (b){
     ev.stopPropagation();
     const k = b.getAttribute("data-kadd"), i = S.metrics.indexOf(k);
@@ -6093,6 +6485,10 @@ document.addEventListener("change", ev => {
     }
     if (km[1] === "v"){ const v = +t.value; if (isFinite(v) && v >= 0) c.v = v; }
     return applyKdef();
+  }
+  if (id === "audmetric" || id === "auddim"){
+    S.aud[id === "audmetric" ? "metric" : "dim"] = t.value; saveAud();
+    return loadAud();
   }
   if (id === "sidkey"){ S.sess.idKey = ev.target.value; return renderSessions(); }
   if (id === "slookup"){ S.sess.lookup = ev.target.value; return; }
