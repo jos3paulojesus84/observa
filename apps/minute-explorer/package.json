@@ -1,8 +1,8 @@
 {
-  "name": "@observa/minute-console",
+  "name": "@observa/minute-explorer",
   "version": "0.1.0",
   "private": true,
-  "description": "Minute Console: a troubleshooting front end built entirely on minute records.",
+  "description": "Minute Explorer: the QoE Explorer's analytics workflows, rebuilt on minute records.",
   "type": "module",
   "scripts": {
     "build": "node build.mjs"
