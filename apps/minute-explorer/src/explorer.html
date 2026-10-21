@@ -757,6 +757,80 @@ select{
   padding:8px 16px; font-size:12.5px; box-shadow:0 16px 40px -20px rgba(0,0,0,.8);
 }
 
+
+/* ── pages and anomalies ─────────────────────────────── */
+.pnav{display:flex; gap:2px; background:var(--panel); border:1px solid var(--border); border-radius:9px; padding:2px}
+.pnav button{font-family:var(--font-ui); font-size:12.5px; font-weight:500; padding:5px 12px; border-radius:7px; color:var(--text-dim);
+  display:inline-flex; align-items:center; gap:7px}
+.pnav button:hover{color:var(--text)}
+.pnav button[aria-current="true"]{background:var(--accent-soft); color:var(--text); box-shadow:inset 0 0 0 1px var(--accent-line)}
+.pcount{font-family:var(--font-mono); font-size:10px; font-weight:600; background:var(--crit); color:#fff; border-radius:999px; padding:1px 6px}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+.drawer-all{width:100%; justify-content:center; margin-top:4px}
+.anom-ctl{display:flex; align-items:center; gap:8px 10px; flex-wrap:wrap; margin-bottom:10px}
+.anom-ctl input{width:240px; max-width:100%}
+.anom-mode{font-size:11.5px; color:var(--text-faint); margin-left:auto}
+.anom-mode.warn{color:var(--warn)}
+.anom-sum{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px}
+.sumc{display:flex; align-items:baseline; gap:7px; padding:7px 12px; border:1px solid var(--border); border-radius:9px;
+  background:var(--panel); border-left:3px solid var(--c)}
+.sumc:hover{background:var(--panel-2)}
+.sumc b{font-family:var(--font-mono); font-size:17px; font-weight:500}
+.sumc span{font-size:12px; color:var(--text-dim)}
+.anom-grid{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:12px; align-items:start}
+@media (max-width:1000px){ .anom-grid{grid-template-columns:minmax(0,1fr)} }
+.anom-list{max-height:min(78vh, 900px); overflow:auto}
+.anom-row{display:grid; grid-template-columns:10px minmax(0,1fr) auto auto auto 70px; gap:10px; align-items:center;
+  width:100%; text-align:left; padding:10px 12px; border-top:1px solid var(--border-soft)}
+.anom-row:first-child{border-top:0}
+.anom-row:hover{background:var(--panel-2)}
+.anom-row.on{background:var(--accent-soft); box-shadow:inset 3px 0 0 var(--accent)}
+.anom-row .sev, .ad-head .sev{width:8px; height:8px; border-radius:50%; background:var(--warn); display:block}
+.anom-row .sev.crit, .ad-head .sev.crit{background:var(--crit)}
+.anom-row .am{min-width:0}
+.anom-row .at{display:block; font-weight:600; font-size:13px}
+.anom-row .kind{font-family:var(--font-mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint); font-weight:400; margin-left:8px}
+.anom-row .ac, .ad-head .ac{display:flex; flex-wrap:wrap; gap:4px; margin-top:4px}
+.anom-row .tag, .ad-head .tag{font-family:var(--font-mono); font-size:10px; background:var(--panel-3); padding:1px 6px; border-radius:5px; color:var(--text-dim)}
+.anom-row .av{font-family:var(--font-mono); font-size:11.5px; text-align:right; white-space:nowrap}
+.anom-row .aw{font-size:11px; color:var(--text-dim); text-align:right; white-space:nowrap}
+.anom-row .aw small{display:block; color:var(--text-faint)}
+.anom-row .fire{color:var(--crit); font-family:var(--font-mono); font-size:10.5px}
+.anom-row .ao{font-size:11px; color:var(--text-dim); text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.anom-row .cc{font-family:var(--font-mono); font-size:10px; border:1px solid var(--border); border-radius:999px; padding:0 5px; margin-left:3px}
+.st{font-family:var(--font-mono); font-size:10px; letter-spacing:.04em; padding:2px 7px; border-radius:999px; white-space:nowrap;
+  color:var(--c); background:color-mix(in srgb, var(--c) 13%, transparent); border:1px solid color-mix(in srgb, var(--c) 40%, transparent)}
+@media (max-width:700px){
+  .anom-row{grid-template-columns:10px minmax(0,1fr) auto}
+  .anom-row .av, .anom-row .aw, .anom-row .ao{display:none}
+}
+.anom-none{padding:18px 14px; font-size:12.5px; color:var(--text-dim)}
+.anom-det{padding:14px 16px; display:flex; flex-direction:column; gap:12px}
+.ad-head{display:grid; grid-template-columns:10px minmax(0,1fr) auto; gap:10px; align-items:start}
+.ad-head .sev{margin-top:7px}
+.ad-head h3{font-family:var(--font-display); font-size:16px; font-weight:600; margin:0}
+@media (max-width:560px){ .ad-head{grid-template-columns:10px minmax(0,1fr)} .ad-head .btn{grid-column:2} }
+.ad-status{display:flex; align-items:center; gap:8px 12px; flex-wrap:wrap}
+.ad-status .seg button[aria-pressed="true"]{background:color-mix(in srgb, var(--c) 16%, transparent); box-shadow:inset 0 0 0 1px var(--c); color:var(--text)}
+.ad-owner{font-size:12px; color:var(--text-dim)}
+.ad-owner b{color:var(--text); font-weight:600}
+.ad-warn{font-size:12px; color:var(--crit)}
+.ad-facts{display:grid; grid-template-columns:max-content minmax(0,1fr); gap:4px 16px; margin:0; font-size:12.5px}
+.ad-facts dt{color:var(--text-faint)}
+.ad-facts dd{margin:0; font-variant-numeric:tabular-nums}
+.ad-occ .k, .ad-thread .k{font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-faint); display:block; margin-bottom:5px}
+.ad-occ svg{display:block; width:100%; height:30px}
+.ad-thread{border-top:1px solid var(--border-soft); padding-top:10px; display:flex; flex-direction:column; gap:8px}
+.cm{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:8px 10px}
+.cmh{display:flex; justify-content:space-between; gap:10px; font-size:12px}
+.cm time, .cm.sys time{font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint)}
+.cm p{margin:4px 0 0; font-size:12.5px; white-space:pre-wrap; overflow-wrap:anywhere}
+.cm.sys{background:none; border:0; padding:0 2px; display:flex; justify-content:space-between; gap:10px; font-size:11.5px; color:var(--text-dim)}
+.cm-none{font-size:12px; color:var(--text-faint)}
+.cm-form{display:flex; gap:8px; align-items:flex-end}
+.cm-form textarea{flex:1; min-width:0; resize:vertical; font-size:12.5px}
+
 /* ── minute explorer additions ─────────────────────────── */
 .kpictl{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
 .kpictl .btn.on{background:var(--accent-soft); border-color:var(--accent-line)}
@@ -850,6 +924,11 @@ details.mrec-wire summary:hover{color:var(--text-dim)}
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         <circle cx="17.8" cy="8.2" r="1.9" fill="currentColor"/>
       </svg><b>Minute Explorer</b></div>
+    <nav class="pnav" aria-label="Pages">
+      <button data-page="anomalies">Anomalies <span class="pcount" id="anomcount" hidden></span></button>
+      <button data-page="explorer">Explorer</button>
+    </nav>
+    <button class="btn" id="anomback" hidden></button>
     <button class="btn vsel" id="viewbtn" title="Switch view"><span id="viewname">Custom</span><i class="car">▾</i></button>
     <button class="btn vback" id="viewback" hidden title="Back to the view you were building">×</button>
     <div class="spacer"></div>
@@ -870,18 +949,17 @@ details.mrec-wire summary:hover{color:var(--text-dim)}
   </div>
 
 
-  <section class="cell" id="cell-triage">
-    <div class="cell-head">
-      <span class="eyebrow">Triage</span>
-      <h2>What needs attention</h2>
-      <span class="lbl" id="inswin">last 24 hours · all traffic</span>
-      <input id="inssearch" class="trisearch" placeholder="Filter these — e.g. california" autocomplete="off">
-      <button class="btn" id="instoggle" title="Collapse this section"></button>
-      <span class="hint" id="inshint"></span>
-    </div>
-    <div id="triage"></div>
-  </section>
-
+  <div id="page-anomalies" hidden>
+    <section class="cell">
+      <div class="cell-head">
+        <span class="eyebrow">Anomalies</span>
+        <h2>What needs attention</h2>
+        <span class="hint">Alerts and automatic findings across all traffic · set a status, take it, comment, or explain it in the Explorer</span>
+      </div>
+      <div id="anomalies"></div>
+    </section>
+  </div>
+  <div id="page-explorer">
   <div class="controls">
     <div class="ctl-row">
       <span class="lbl">Window</span>
@@ -951,6 +1029,7 @@ details.mrec-wire summary:hover{color:var(--text-dim)}
     </div>
     <div class="panel" id="sessions"></div>
   </section>
+  </div>
 </div>
 
 <script>
@@ -1238,6 +1317,8 @@ const S = {
   metrics: DEFAULT_METRICS.slice(),
   kdef: KPI_DEF_DEFAULT(),     // what makes a minute count as having issues
   kdefOpen: false,
+  page: "explorer",            // explorer | anomalies
+  anom: {range:"24h", show:"open", kind:"all", q:"", sel:null, from:null},
   gran: "auto",                // timeseries bucket size — coarser than auto only
   live: false, liveT: null, tick: 0, busy: false,
   unit: "pct",                 // show paired metrics as rates or as counts
@@ -1356,11 +1437,11 @@ const periodOf = w => w.start + "," + w.end;
 
 /* Tables and sessions follow the brushed slice when there is one; the metric
    cards always keep the full window, so the slice stays legible in context. */
-/* Triage is a standing watch, not part of the working view: always the last
-   24 hours of all traffic, whatever the dashboard below is set to. */
+/* The anomaly watch is not part of the working view: all traffic over the
+   anomalies page's own window, whatever the Explorer is set to. */
 function insWin(){
-  const end = S.now;
-  return {start: end - 86400, end, len: 86400, label: "last 24 hours"};
+  const end = S.now, len = S.anom.range === "7d" ? 7 * 86400 : 86400;
+  return {start: end - len, end, len, label: S.anom.range === "7d" ? "last 7 days" : "last 24 hours"};
 }
 
 function tableWin(){
@@ -3777,53 +3858,33 @@ const cohortTags = a => {
   return ks.map(k => `<span class="tag" title="${esc(k + " = " + a.dims[k])}">${esc(k)}=${esc(a.dims[k])}</span>`).join("");
 };
 function renderAlerts(){
-  const n = S.alerts.rows.length;
-  const act = S.alerts.rows.filter(a => a.status === "OPEN"), na = act.length;
+  const open = buildAnomalies().filter(x => (OPEN_STATUSES.includes(x.status) || x.reopened) && x.firing)
+    .sort((p, q) => ((q.sev === "CRITICAL") - (p.sev === "CRITICAL")) || (q.last - p.last));
+  const n = open.length;
   const bell = document.getElementById("bell"), badge = document.getElementById("bellbadge");
-  bell.classList.toggle("warnonly", !act.some(a => a.sev === "CRITICAL"));
+  bell.classList.toggle("warnonly", !open.some(x => x.sev === "CRITICAL"));
   bell.classList.toggle("on", S.alerts.open);
-  badge.hidden = !na;
-  badge.textContent = na > 99 ? "99+" : na;
-  bell.title = na
-    ? na + " active alert" + (na===1?"":"s") + " — click for everything raised in the last 24 hours"
-    : n ? "No active alert · " + n + " raised in the last 24 hours, all since resolved"
-        : "No alert raised in the last 24 hours";
-
+  badge.hidden = !n;
+  badge.textContent = n > 99 ? "99+" : n;
+  bell.title = n ? n + " open anomal" + (n === 1 ? "y" : "ies") + " still firing" : "No open anomaly is firing";
   const dr = document.getElementById("drawer");
   dr.classList.toggle("open", S.alerts.open);
   dr.setAttribute("aria-hidden", String(!S.alerts.open));
-  document.getElementById("drawersub").textContent =
-    insWin().label + (na ? " · " + na + " active" : "");
+  document.getElementById("drawersub").textContent = insWin().label + (n ? " · " + n + " open" : "");
   const body = document.getElementById("drawerbody");
   if (S.alerts.err){ body.innerHTML = errNote(S.alerts.err, "alerts"); return; }
-  if (S.alerts.loading){
+  if (S.alerts.loading && !S.alerts.rows.length){
     body.innerHTML = Array.from({length:4},()=>'<div class="skel" style="height:52px;margin-bottom:7px"></div>').join("");
     return;
   }
-  if (!n){
-    body.innerHTML = `<div style="padding:14px 10px;font-size:12.5px;color:var(--text-dim)">
-      No alert rule fired in ${esc(insWin().label)}.</div>`;
-    return;
-  }
-  body.innerHTML = S.alerts.rows
-    .slice().sort((a, b) => (b.status === "OPEN") - (a.status === "OPEN") || b.t0 - a.t0)
-    .map(a => {
-    const M = METRICS[a.metric] || {label:a.metric};
-    const cur = S.view.temp && S.view.temp.id === a.id;
-    return `<button class="alert-row ${cur?"cur":""}" data-alert="${esc(a.id)}">
-      <span class="ar-top">
-        <i class="sev ${a.sev === "CRITICAL" ? "crit" : ""}"></i>
-        <span class="nm">${esc(M.label)}</span>
-        <span class="pk">${esc(fmt(a.srcMetric || a.metric, a.peak))}</span>
-      </span>
-      <span class="ar-sub">
-        <span class="mono">${esc(HHMS(a.t0*1000))}</span>
-        ${cohortTags(a)}
-        <span class="tag">${esc(a.cat === "ANOMALY" ? "anomaly" : "threshold")}</span>
-        <span>${a.views.toLocaleString()} view${a.views===1?"":"s"} · ${a.users.toLocaleString()} user${a.users===1?"":"s"}</span>
-        ${a.status === "OPEN" ? `<span class="open">OPEN</span>` : ""}
-      </span></button>`;
-  }).join("");
+  body.innerHTML = (n ? open.map(x => `<button class="alert-row" data-asel="${esc(x.key)}">
+      <span class="ar-top"><i class="sev ${x.sev === "CRITICAL" ? "crit" : ""}"></i>
+        <span class="nm">${esc(x.label)}</span><span class="pk">${esc(anomValue(x))}</span></span>
+      <span class="ar-sub">${cohortChips(x.dims)} ${statusChip(x)}
+        ${x.owner ? `<span>${esc(ASTORE.nameOf(x.owner))}</span>` : ""}
+        ${x.comments ? `<span>${x.comments} comment${x.comments === 1 ? "" : "s"}</span>` : ""}</span></button>`).join("")
+    : `<div style="padding:14px 10px;font-size:12.5px;color:var(--text-dim)">No open anomaly is firing in ${esc(insWin().label)}.</div>`)
+    + `<button class="btn drawer-all" data-page="anomalies">All anomalies →</button>`;
 }
 function renderBreakMode(){
   document.querySelectorAll("#bmode button").forEach(b =>
@@ -3885,87 +3946,7 @@ function findingText(f){
   return {head:M.label, val:fmt(f.metric, f.value), bad:true,
     why:"vs " + fmt(f.metric, f.base) + " overall · " + (f.ratio >= 10 ? Math.round(f.ratio) : f.ratio.toFixed(1)) + "× "};
 }
-function renderInsights(){
-  const host = document.getElementById("triage");
-  const tog = document.getElementById("instoggle");
-  tog.textContent = S.ins.open ? "Hide" : "Show";
-  tog.title = S.ins.open ? "Collapse this section" : "Expand this section";
-  document.getElementById("inswin").hidden = !S.ins.open;
-  document.getElementById("inssearch").hidden = !S.ins.open;
-  document.getElementById("inshint").textContent = S.ins.open
-    ? "Click anything here to filter the dashboard below to it"
-    : S.alerts.loading || S.ins.loading ? "checking the last 24 hours…"
-    : [S.alerts.rows.filter(a => a.status === "OPEN").length + " active alert"
-        + (S.alerts.rows.filter(a => a.status === "OPEN").length===1?"":"s"),
-       S.ins.findings.length + " finding" + (S.ins.findings.length===1?"":"s")].join(" · ")
-      + " in the last 24 hours";
-  if (!S.ins.open){ host.innerHTML = ""; return; }
-
-  const q = insQ();
-  const al = q ? S.alerts.rows.filter(a => alertHay(a).indexOf(q) >= 0) : S.alerts.rows;
-  const alHidden = S.alerts.rows.length - al.length;
-  const alertBox = `<div class="tribox">
-    <h3>Recent alerts ${S.alerts.rows.length ? `<b>${al.length}${alHidden ? " of " + S.alerts.rows.length : ""}</b>` : ""}
-      ${S.alerts.rows.length ? `<button class="more" id="allalerts">Details</button>` : ""}</h3>
-    ${S.alerts.err ? `<div style="padding:10px">${errNote(S.alerts.err, "alerts")}</div>`
-      : S.alerts.loading && !al.length ? `<div style="padding:10px">${
-          Array.from({length:3},()=>'<div class="skel" style="height:30px;margin-bottom:7px"></div>').join("")}</div>`
-      : !al.length ? `<div class="trinone">${q
-          ? esc("No alert matches “" + S.ins.q.trim() + "”.") + ` <button class="btn" data-insqclr="1" style="margin-left:6px">Clear</button>`
-          : esc("No alert fired in " + insWin().label + ".")}</div>`
-      : `<div class="triscroll">` + al.map(a => {
-          const M = METRICS[a.metric] || {label:a.metric};
-          const cur = S.view.temp && S.view.temp.id === a.id;
-          return `<button class="trirow ${cur?"cur":""}" data-alert="${esc(a.id)}"
-            ${cur?`aria-current="true" title="This is the alert the dashboard is showing"`:""}>
-            <span class="l1"><i class="sev ${a.sev === "CRITICAL" ? "crit" : ""}"></i>
-              <span class="met">${esc(M.label)}</span>
-              <span class="val bad">${esc(fmt(a.srcMetric || a.metric, a.peak))}</span></span>
-            <span class="l2"><span class="mono">${esc(HHMS(a.t0*1000))}</span>
-              ${cohortTags(a)}
-              ${a.status === "OPEN" ? `<span class="x">OPEN</span>` : ""}</span></button>`;
-        }).join("") + `</div>`}
-  </div>`;
-
-  const all = S.ins.findings.map((f, i) => ({f, i}));
-  const fs = q ? all.filter(({f}) => findingHay(f).indexOf(q) >= 0) : all;
-  const fsHidden = all.length - fs.length;
-  const insBox = `<div class="tribox">
-    <h3>Automatic findings ${all.length ? `<b>${fs.length}${fsHidden ? " of " + all.length : ""}</b>` : ""}
-      <button class="more" data-insscan="1">Rescan</button></h3>
-    ${S.ins.err ? `<div style="padding:10px">${errNote(S.ins.err, "the scan")}</div>`
-      : S.ins.loading ? `<div style="padding:10px">${
-          Array.from({length:4},()=>'<div class="skel" style="height:30px;margin-bottom:7px"></div>').join("")}</div>`
-      : !fs.length ? `<div class="trinone">${q
-          ? esc("No finding matches “" + S.ins.q.trim() + "”.") + ` <button class="btn" data-insqclr="1" style="margin-left:6px">Clear</button>`
-          : esc("Nothing stands out: no slice with enough traffic sits far from the overall numbers in " + insWin().label + ".")}</div>`
-      : `<div class="triscroll">` + fs.map(({f, i}) => {
-          const t = findingText(f);
-          return `<button class="trirow" data-ins="${i}">
-            <span class="l1"><i class="sev ${f.kind === "top" ? "calm" : f.ratio >= 3 ? "crit" : ""}"></i>
-              <span class="met">${esc(t.head)}</span>
-              <span class="val ${t.bad ? "bad" : ""}">${esc(t.val)}</span></span>
-            <span class="l2">
-              ${Object.keys(f.vals).map(k => `<span class="tag" title="${esc(k + "=" + f.vals[k])}">${esc(f.vals[k])}</span>`).join("")}
-              <span class="why">${esc(t.why)}</span>
-              <span class="why">${esc(compact(f.plays) + " playbacks")}</span>
-              ${(f.also || []).length ? `<span class="why" title="the same slice is off on these too">also ${
-                esc(f.also.slice(0,2).map(x => (METRICS[x.metric]||{label:x.metric}).label.toLowerCase()
-                  + " " + (x.ratio >= 10 ? Math.round(x.ratio) : x.ratio.toFixed(1)) + "\u00d7").join(", "))}</span>` : ""}
-              ${f.sampled ? `<span class="why" title="the source capped this breakdown, so it was ranked within a sample">sampled</span>` : ""}
-            </span></button>`;
-        }).join("") + `</div>`}
-    <div class="trifoot">${S.ins.loading ? "scanning…"
-      : esc(S.ins.scanned + " preset scans · last 24h, all traffic"
-        + (S.ins.stamp ? " · scanned " + stampTxt(S.ins.stamp) : "")
-        + " · one row per problem · ranked by excess minutes with issues, at least "
-        + FIND_ISSUE_RATIO + "\u00d7 above baseline")}</div>
-  </div>`;
-
-  host.innerHTML = `<div class="tri">${alertBox}${insBox}</div>`;
-  const cur = host.querySelector(".trirow.cur");
-  if (cur) revealInList(cur);
-}
+function renderInsights(){ renderAnomalies(); renderNav(); }
 /* Scroll the alert list itself and never the page: the click that selected this
    row often came from a chart marker far below, and yanking the viewport up to
    the triage section would take away the chart the user was reading. */
@@ -5784,13 +5765,13 @@ function applyFinding(n){
   S.view.saved = null;
   // the finding is a 24h claim, so the dashboard follows it there
   if (S.live) stopLive();
-  S.absWin = null; S.range = "24h";
+  S.absWin = null; S.range = S.anom.range;
   focusSessions(m, true);                       // force: the drill promises sessions
   renderControls(); renderFilters(); renderViewBar(); renderStatus(); renderCards();
   // the headline has to follow the drill too, or it keeps reporting the
   // population the finding was found in rather than the cohort now on screen
   loadKpi(); loadCards(); loadBreakdowns();
-  toast("Filtered to " + Object.values(f.vals).join(" · ") + " · last 24 hours.");
+  toast("Filtered to " + Object.values(f.vals).join(" · ") + " · " + insWin().label + ".");
 }
 
 function refresh(){
@@ -5812,7 +5793,38 @@ document.addEventListener("click", ev => {
     S.alerts.open = false; renderAlerts();
   }
 
-  let b = hit("[data-kshow]"); if (b){ S.kdef.show = b.getAttribute("data-kshow"); return applyKdef(true); }
+  let b = hit("[data-page]"); if (b){ S.alerts.open = false; renderAlerts(); return setPage(b.getAttribute("data-page")); }
+  b = hit("[data-asel]"); if (b){
+    S.anom.sel = b.getAttribute("data-asel");
+    if (S.alerts.open){ S.alerts.open = false; renderAlerts(); }
+    const x = buildAnomalies().find(a => a.key === S.anom.sel);
+    if (x && !filteredAnomalies().some(a => a.key === x.key)){ S.anom.show = "all"; S.anom.kind = "all"; S.anom.q = ""; }
+    return S.page === "anomalies" ? renderAnomalies() : setPage("anomalies");
+  }
+  b = hit("[data-arange]"); if (b) return setAnomRange(b.getAttribute("data-arange"));
+  b = hit("[data-ashow]"); if (b){ S.anom.show = b.getAttribute("data-ashow"); return renderAnomalies(); }
+  b = hit("[data-ashowst]"); if (b){
+    const k = b.getAttribute("data-ashowst");
+    S.anom.show = k === "resolved" || k === "muted" ? k : "open"; S.anom.q = k === "resolved" || k === "muted" ? "" : statusMeta(k).l;
+    return renderAnomalies();
+  }
+  b = hit("[data-akind]"); if (b){ S.anom.kind = b.getAttribute("data-akind"); return renderAnomalies(); }
+  if (hit("[data-arescan]")) return loadInsights(true);
+  b = hit("[data-astatus]"); if (b){
+    const k = b.getAttribute("data-astatus"), x = buildAnomalies().find(a => a.key === S.anom.sel);
+    if (!x || (x.status === k && !x.reopened)) return;
+    return ASTORE.setStatus(x.key, {status: k}, "set the status to " + statusMeta(k).l.toLowerCase());
+  }
+  b = hit("[data-aown]"); if (b){
+    const x = buildAnomalies().find(a => a.key === S.anom.sel); if (!x) return;
+    const me = ASTORE.me(), take = b.getAttribute("data-aown") === "take";
+    const patch = {owner: take ? (me.id || "local") : null};
+    if (take && x.status === "new") patch.status = "ack";
+    return ASTORE.setStatus(x.key, patch, take ? "took ownership" + (patch.status ? " and acknowledged it" : "") : "released ownership");
+  }
+  b = hit("[data-aexplain]"); if (b) return explainAnomaly(b.getAttribute("data-aexplain"));
+  if (hit("#anomback")){ if (S.anom.from) S.anom.sel = S.anom.from; return setPage("anomalies"); }
+  b = hit("[data-kshow]"); if (b){ S.kdef.show = b.getAttribute("data-kshow"); return applyKdef(true); }
   if (hit("#kdefbtn")){ S.kdefOpen = !S.kdefOpen; return renderKpi(); }
   if (hit("[data-kdefclose]")){ S.kdefOpen = false; return renderKpi(); }
   b = hit("[data-klane]"); if (b){
@@ -5856,7 +5868,7 @@ document.addEventListener("click", ev => {
   b = hit("[data-alert]"); if (b) return openAlert(b.getAttribute("data-alert"));
   b = hit("[data-unit]"); if (b) return setUnit(b.getAttribute("data-unit"));
   if (hit("#viewbtn")) return viewPop(hit("#viewbtn"));
-  if (hit("#viewback")) return closeTempView();
+  if (hit("#viewback")){ S.anom.from = null; renderNav(); return closeTempView(); }
   if (hit("#refresh") || hit('[data-act="refresh"]')) return refresh();
   if (hit("#theme")){
     const root = document.documentElement;
@@ -6029,7 +6041,30 @@ document.addEventListener("click", ev => {
     return;
   }
 });
+document.addEventListener("submit", ev => {
+  const f = ev.target.closest && ev.target.closest("[data-acomment]");
+  if (!f) return;
+  ev.preventDefault();
+  const ta = f.querySelector("textarea"), text = ta.value.trim();
+  if (!text) return;
+  ASTORE.addComment(f.getAttribute("data-acomment"), text);
+  ta.value = "";
+});
+document.addEventListener("keydown", ev => {
+  if (ev.target.id === "acomment" && ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)){
+    ev.preventDefault();
+    const f = ev.target.closest("form"); if (f) f.requestSubmit();
+  }
+});
 document.addEventListener("input", ev => {
+  if (ev.target.id === "anomq"){
+    S.anom.q = ev.target.value;
+    const pos = ev.target.selectionStart;
+    renderAnomalies();
+    const again = document.getElementById("anomq");
+    if (again){ again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) {} }
+    return;
+  }
   if (ev.target.id !== "inssearch") return;
   S.ins.q = ev.target.value;
   const el = ev.target, pos = el.selectionStart;
@@ -6185,6 +6220,364 @@ function viewPop(anchor){
 }
 
 
+/* ═══════════════════════════════════════════════════════════════
+   13. Anomalies
+
+   Every alert a rule raised and every finding the automatic scans
+   surfaced, as one list people can work: set a status, take ownership,
+   leave comments, and drill into the Explorer to explain it. An anomaly
+   is keyed by WHAT it is — the metric and the cohort it was seen on —
+   not by when it fired, so a standing regression that re-triggers every
+   few hours is one anomaly with several occurrences, and its status and
+   thread survive every refresh.
+
+   Status and comments are shared state. Published, they live in the
+   page's shared database, so everyone who opens the link sees the same
+   statuses and threads. Opened as a local file there is no shared store,
+   and they are kept in this browser only — the page says which.
+   ═══════════════════════════════════════════════════════════════ */
+const ANOM_STATUS = [
+  {k:"new",           l:"New",           c:"--crit"},
+  {k:"ack",           l:"Acknowledged",  c:"--warn"},
+  {k:"investigating", l:"Investigating", c:"--accent"},
+  {k:"resolved",      l:"Resolved",      c:"--good"},
+  {k:"muted",         l:"Muted",         c:"--text-faint"},
+];
+const OPEN_STATUSES = ["new", "ack", "investigating"];
+const statusMeta = k => ANOM_STATUS.find(s => s.k === k) || ANOM_STATUS[0];
+const anomSig = (kind, metric, dims) => kind + ":" + metric + "|" +
+  Object.keys(dims || {}).sort().map(k => k + "=" + dims[k]).join("&");
+function anomKey(sig){
+  let h = 2166136261;
+  for (let i = 0; i < sig.length; i++){ h ^= sig.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let h2 = 5381;
+  for (let i = 0; i < sig.length; i++) h2 = (Math.imul(h2, 33) ^ sig.charCodeAt(i)) >>> 0;
+  return "a" + (h >>> 0).toString(36) + h2.toString(36);
+}
+
+/* ── the store: shared when published, this browser when not ─────── */
+const ASTORE = (() => {
+  const LS = "minute-explorer:anomalies";
+  let mode = "local", db = null, user = null, me = {id: null, name: ""};
+  let status = {}, comments = {};
+  const names = {};
+  let commentUnsub = null, commentKey = null;
+  const changed = () => { renderAnomalies(); renderAlerts(); renderNav(); };
+  const loadLocal = () => {
+    try { const d = JSON.parse(localStorage.getItem(LS) || "{}"); status = d.status || {}; comments = d.comments || {}; }
+    catch (e) { status = {}; comments = {}; }
+  };
+  const saveLocal = () => { try { localStorage.setItem(LS, JSON.stringify({status, comments})); } catch (e) { /* storage blocked */ } };
+  loadLocal();
+
+  async function init(){
+    if (!window.claude || typeof window.claude.use !== "function") return;
+    try {
+      const [d, u] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      user = u;
+      if (u){ const m = await u.me(); me = {id: m.id, name: m.name || ""}; }
+      if (!d){ changed(); return; }
+      db = d; mode = "shared"; status = {}; comments = {};
+      db.collection("anomalies").onSnapshot(snap => {
+        const next = {};
+        snap.docs.forEach(doc => { next[doc.id] = doc.data() || {}; });
+        status = next;
+        resolveNames(Object.values(status).flatMap(s => [s.owner, s.by]));
+        changed();
+      }, () => { mode = "unavailable"; changed(); });
+      changed();
+    } catch (e) { /* stay local */ }
+  }
+  async function resolveNames(ids){
+    if (!user) return;
+    const want = [...new Set(ids.filter(id => id && id !== "local" && !(id in names)))];
+    if (!want.length) return;
+    try {
+      const ps = await user.profiles(want);
+      want.forEach(id => { names[id] = (ps && ps[id] && ps[id].name) || "Someone"; });
+      changed();
+    } catch (e) { /* names stay generic */ }
+  }
+  function watchComments(key){
+    if (mode !== "shared" || commentKey === key) return;
+    if (commentUnsub) commentUnsub();
+    commentKey = key;
+    commentUnsub = db.collection("anomalies/" + key + "/comments").orderBy("at", "asc").onSnapshot(snap => {
+      comments[key] = snap.docs.map(d => ({id: d.id, ...(d.data() || {})}));
+      resolveNames(comments[key].map(c => c.by));
+      changed();
+    }, () => {});
+  }
+  const who = () => me.id || "local";
+  async function write(key, doc){
+    status[key] = doc; changed();
+    if (mode === "shared"){
+      try { await db.doc("anomalies/" + key).set(doc); }
+      catch (e) { toast(e && e.code === "not_granted" ? "You can view anomalies here but not change them." : "Couldn't save that change."); }
+    } else saveLocal();
+  }
+  async function setStatus(key, patch, note){
+    const cur = status[key] || {status: "new"};
+    await write(key, {...cur, ...patch, at: Date.now(), by: who()});
+    if (note) await addComment(key, note, true);
+  }
+  async function addComment(key, text, system){
+    const c = {text: String(text).slice(0, 4000), by: who(), at: Date.now(), system: !!system};
+    const cur = status[key] || {status: "new"};
+    if (mode === "shared"){
+      try {
+        await db.collection("anomalies/" + key + "/comments").add(c);
+        await db.doc("anomalies/" + key).set({...cur, comments: (cur.comments || 0) + 1});
+      } catch (e) { toast(e && e.code === "not_granted" ? "You can view anomalies here but not comment." : "Couldn't post that comment."); }
+    } else {
+      (comments[key] = comments[key] || []).push(c);
+      status[key] = {...cur, comments: (cur.comments || 0) + 1};
+      saveLocal(); changed();
+    }
+  }
+  const nameOf = id => !id ? "" : (id === me.id || id === "local") ? (me.name ? me.name + " (you)" : "You") : (names[id] || "Someone");
+  return {init, get: k => status[k], comments: k => comments[k] || [], watchComments, setStatus, addComment,
+          nameOf, mode: () => mode, me: () => me, isMe: id => !!id && (id === me.id || id === "local")};
+})();
+
+/* ── one list of anomalies: alerts grouped by what they are, plus findings ── */
+function buildAnomalies(){
+  const by = new Map();
+  S.alerts.rows.forEach(a => {
+    const sig = anomSig("alert", a.srcMetric || a.metric, a.dims);
+    let x = by.get(sig);
+    if (!x){
+      x = {key: anomKey(sig), sig, kind: "alert", metric: a.metric, srcMetric: a.srcMetric || a.metric, dims: a.dims,
+           occ: [], sev: "WARNING", cat: a.cat, views: 0, users: 0, peak: null};
+      by.set(sig, x);
+    }
+    x.occ.push(a);
+    if (a.sev === "CRITICAL") x.sev = "CRITICAL";
+    x.views += a.views; x.users += a.users;
+    const better = (METRICS[x.srcMetric] || {}).dir === "up";
+    if (x.peak == null || (better ? a.peak < x.peak : a.peak > x.peak)) x.peak = a.peak;
+  });
+  S.ins.findings.forEach((f, i) => {
+    if (f.kind === "top") return;
+    const sig = anomSig("finding", f.metric, f.vals);
+    if (by.has(sig)) return;
+    by.set(sig, {key: anomKey(sig), sig, kind: "finding", metric: f.metric, srcMetric: f.metric, dims: f.vals, find: f, findIdx: i,
+                 occ: [], sev: f.ratio >= 3 ? "CRITICAL" : "WARNING", cat: "FINDING"});
+  });
+  const scanAt = S.ins.stamp ? S.ins.stamp / 1000 : S.now;
+  return [...by.values()].map(x => {
+    if (x.kind === "alert"){
+      x.occ.sort((p, q) => q.t0 - p.t0);
+      x.first = Math.min(...x.occ.map(o => o.t0));
+      x.last = Math.max(...x.occ.map(o => o.status === "OPEN" ? S.now : o.t1));
+      x.firing = x.occ.some(o => o.status === "OPEN");
+    } else { x.first = x.last = scanAt; x.firing = true; }
+    const st = ASTORE.get(x.key) || {};
+    x.status = st.status || "new";
+    x.owner = st.owner || null;
+    x.comments = st.comments || 0;
+    x.changedAt = st.at || null;
+    // a resolved anomaly that fires again is not resolved
+    x.reopened = x.status === "resolved" && x.firing && x.kind === "alert" && st.at && x.last * 1000 > st.at + 60000;
+    x.label = (METRICS[x.metric] || {label: x.metric}).label;
+    return x;
+  });
+}
+function filteredAnomalies(){
+  const q = S.anom.q.trim().toLowerCase();
+  return buildAnomalies().filter(x => {
+    if (S.anom.kind !== "all" && x.kind !== S.anom.kind) return false;
+    const open = OPEN_STATUSES.includes(x.status) || x.reopened;
+    if (S.anom.show === "open" && !open) return false;
+    if (S.anom.show === "resolved" && (x.status !== "resolved" || x.reopened)) return false;
+    if (S.anom.show === "muted" && x.status !== "muted") return false;
+    if (q){
+      const hay = (x.label + " " + x.metric + " " + x.kind + " " + statusMeta(x.status).l + " " +
+        Object.keys(x.dims).map(k => k + " " + x.dims[k]).join(" ")).toLowerCase();
+      if (hay.indexOf(q) < 0) return false;
+    }
+    return true;
+  }).sort((p, q) => (q.firing - p.firing) || ((q.sev === "CRITICAL") - (p.sev === "CRITICAL")) || (q.last - p.last));
+}
+const openAnomalyCount = () => buildAnomalies().filter(x => (OPEN_STATUSES.includes(x.status) || x.reopened) && x.firing).length;
+
+/* ── rendering ─────────────────────────────────────────────────────── */
+const whenTxt = t => (S.now - t > 20 * 3600 ? DAY(t) + " " : "") + HH(t);
+const cohortChips = dims => {
+  const ks = Object.keys(dims || {});
+  if (!ks.length) return `<span class="tag">all traffic</span>`;
+  return ks.map(k => `<span class="tag" title="${esc(k + " = " + dims[k])}">${esc(dimLabel(k))} · ${esc(dims[k])}</span>`).join("");
+};
+const statusChip = x => {
+  const m = statusMeta(x.status);
+  return `<span class="st" style="--c:var(${x.reopened ? "--crit" : m.c})">${esc(x.reopened ? "Firing again" : m.l)}</span>`;
+};
+function anomValue(x){
+  if (x.kind === "finding"){
+    const f = x.find;
+    return f.kind === "issue" ? mins(f.excess) + " excess" : fmt(f.metric, f.value);
+  }
+  return x.peak == null ? "" : "worst " + fmt(x.srcMetric, x.peak);
+}
+
+function renderNav(){
+  const n = openAnomalyCount();
+  const el = document.getElementById("anomcount");
+  if (el){ el.textContent = n || ""; el.hidden = !n; }
+  document.querySelectorAll("[data-page]").forEach(b => b.setAttribute("aria-current", String(b.getAttribute("data-page") === S.page)));
+  const vb = document.getElementById("viewbtn"); if (vb) vb.hidden = S.page !== "explorer";
+  const back = document.getElementById("anomback");
+  if (back){
+    back.hidden = !(S.page === "explorer" && S.view.temp && S.anom.from);
+    back.textContent = "← Back to anomaly";
+  }
+}
+
+function renderAnomalies(){
+  const host = document.getElementById("anomalies");
+  if (!host || S.page !== "anomalies") return;
+  const all = buildAnomalies(), list = filteredAnomalies();
+  const count = k => all.filter(x => x.status === k && !x.reopened).length;
+  const firingAgain = all.filter(x => x.reopened).length;
+  const loading = (S.alerts.loading && !S.alerts.rows.length) || (S.ins.loading && !S.ins.findings.length);
+  if (!list.some(x => x.key === S.anom.sel)) S.anom.sel = list.length ? list[0].key : null;
+  const sel = all.find(x => x.key === S.anom.sel) || null;
+  const mode = ASTORE.mode();
+
+  const seg = (name, cur, opts) => `<div class="seg" role="group">${opts.map(([k, l]) =>
+    `<button data-${name}="${k}" aria-pressed="${cur === k}">${esc(l)}</button>`).join("")}</div>`;
+  const head = `<div class="anom-ctl">
+      ${seg("arange", S.anom.range, [["24h", "Last 24 h"], ["7d", "Last 7 days"]])}
+      ${seg("ashow", S.anom.show, [["open", "Open"], ["resolved", "Resolved"], ["muted", "Muted"], ["all", "All"]])}
+      ${seg("akind", S.anom.kind, [["all", "All"], ["alert", "Alerts"], ["finding", "Findings"]])}
+      <input id="anomq" placeholder="Filter — e.g. comcast, rebuffering" value="${esc(S.anom.q)}" autocomplete="off">
+      <button class="btn" data-arescan="1" title="Run the automatic scans again">Rescan</button>
+      <span class="anom-mode ${mode === "shared" ? "" : "warn"}">${esc(
+        mode === "shared" ? "Statuses and comments are shared with everyone who opens this page"
+        : mode === "unavailable" ? "The shared store is unavailable — changes stay in this browser"
+        : "Statuses and comments are kept in this browser only")}</span>
+    </div>
+    <div class="anom-sum">
+      ${ANOM_STATUS.map(s => `<button class="sumc" data-ashowst="${s.k}" style="--c:var(${s.c})">
+        <b>${count(s.k)}</b><span>${esc(s.l)}</span></button>`).join("")}
+      ${firingAgain ? `<button class="sumc" data-ashow="open" style="--c:var(--crit)"><b>${firingAgain}</b><span>Firing again</span></button>` : ""}
+    </div>`;
+
+  const rows = loading ? Array.from({length: 6}, () => '<div class="skel" style="height:44px;margin:8px"></div>').join("")
+    : !list.length ? `<div class="anom-none">${esc(all.length
+        ? "Nothing matches these filters."
+        : "No alert fired and no finding stood out in " + insWin().label + ".")}</div>`
+    : list.map(x => `<button class="anom-row ${x.key === S.anom.sel ? "on" : ""}" data-asel="${esc(x.key)}">
+        <i class="sev ${x.sev === "CRITICAL" ? "crit" : ""}" title="${esc(x.sev.toLowerCase())}"></i>
+        <span class="am">
+          <span class="at">${esc(x.label)}<span class="kind">${x.kind === "alert" ? (x.cat === "ANOMALY" ? "anomaly alert" : "threshold alert") : "finding"}</span></span>
+          <span class="ac">${cohortChips(x.dims)}</span>
+        </span>
+        <span class="av">${esc(anomValue(x))}</span>
+        <span class="aw">${x.firing ? `<span class="fire">${x.kind === "alert" ? "firing" : "in last scan"}</span>` : esc("quiet since " + whenTxt(x.last))}
+          ${x.kind === "alert" && x.occ.length > 1 ? `<small>${x.occ.length} occurrences</small>` : ""}</span>
+        ${statusChip(x)}
+        <span class="ao">${x.owner ? esc(ASTORE.nameOf(x.owner).replace(" (you)", "")) : ""}${x.comments ? ` <span class="cc" title="${x.comments} comment${x.comments === 1 ? "" : "s"}">${x.comments}</span>` : ""}</span>
+      </button>`).join("");
+
+  host.innerHTML = head + `<div class="anom-grid">
+    <div class="panel anom-list">${rows}</div>
+    <div class="panel anom-det">${sel ? anomDetailHTML(sel) : `<div class="anom-none">Select an anomaly to see it, set its status and comment on it.</div>`}</div>
+  </div>`;
+  if (sel) ASTORE.watchComments(sel.key);
+}
+
+function anomDetailHTML(x){
+  const w = insWin();
+  const ownerMe = ASTORE.isMe(x.owner);
+  const facts = [];
+  if (x.kind === "alert"){
+    facts.push(["Raised by", x.cat === "ANOMALY" ? "anomaly detection" : "threshold rule"]);
+    facts.push(["First seen", whenTxt(x.first)], ["Last seen", x.firing ? "now — still firing" : whenTxt(x.last)]);
+    facts.push(["Occurrences", String(x.occ.length)], ["Worst value", fmt(x.srcMetric, x.peak)]);
+    facts.push(["Affected", x.views.toLocaleString() + " views · " + x.users.toLocaleString() + " users"]);
+  } else {
+    const f = x.find;
+    facts.push(["Raised by", "automatic scan"], ["Scanned", whenTxt(x.last)]);
+    if (f.kind === "issue"){
+      facts.push(["Minutes with it", mins(f.value)], ["Expected", mins(f.base)],
+                 ["Excess", mins(f.excess) + " · " + (f.ratio >= 10 ? Math.round(f.ratio) : f.ratio.toFixed(1)) + "× baseline"]);
+    } else facts.push(["Value", fmt(f.metric, f.value)], ["Overall", fmt(f.metric, f.base)]);
+    facts.push(["Playbacks", compact(f.plays)]);
+    if ((f.also || []).length) facts.push(["Also off", f.also.slice(0, 3).map(a => (METRICS[a.metric] || {label: a.metric}).label.toLowerCase()).join(", ")]);
+  }
+  // occurrences across the window
+  const W = 600, H = 30, X = t => Math.max(0, Math.min(W, (t - w.start) / w.len * W));
+  const occ = x.kind === "alert" ? x.occ.map(o => {
+    const a = X(o.t0), b = X(o.status === "OPEN" ? S.now : Math.max(o.t1, o.t0 + 60));
+    return `<rect x="${a.toFixed(1)}" y="6" width="${Math.max(2.5, b - a).toFixed(1)}" height="18" rx="2"
+      fill="var(${o.sev === "CRITICAL" ? "--crit" : "--warn"})" opacity="${o.status === "OPEN" ? 1 : .7}"><title>${esc(whenTxt(o.t0) + " · " + fmt(x.srcMetric, o.peak))}</title></rect>`;
+  }).join("") : `<rect x="0" y="6" width="${W}" height="18" rx="2" fill="var(--warn)" opacity=".18"/>`;
+
+  const thread = ASTORE.comments(x.key);
+  const comments = thread.length ? thread.map(c => c.system
+      ? `<div class="cm sys"><span>${esc(ASTORE.nameOf(c.by))} ${esc(c.text)}</span><time>${esc(whenTxt(c.at / 1000))}</time></div>`
+      : `<div class="cm"><div class="cmh"><b>${esc(ASTORE.nameOf(c.by))}</b><time>${esc(whenTxt(c.at / 1000))}</time></div><p>${esc(c.text)}</p></div>`).join("")
+    : `<div class="cm-none">No comments yet. Say what you found, what you ruled out, or who is on it.</div>`;
+
+  return `<div class="ad-head">
+      <i class="sev ${x.sev === "CRITICAL" ? "crit" : ""}"></i>
+      <div><h3>${esc(x.label)}</h3><div class="ac">${cohortChips(x.dims)}</div></div>
+      <button class="btn primary" data-aexplain="${esc(x.key)}" title="Open the Explorer scoped to this cohort, metric and time">Explain in Explorer →</button>
+    </div>
+    <div class="ad-status">
+      <div class="seg" role="group" aria-label="Status">${ANOM_STATUS.map(s =>
+        `<button data-astatus="${s.k}" aria-pressed="${x.status === s.k}" style="--c:var(${s.c})">${esc(s.l)}</button>`).join("")}</div>
+      <span class="ad-owner">${x.owner ? "Owner: <b>" + esc(ASTORE.nameOf(x.owner)) + "</b>" : "No owner"}</span>
+      <button class="btn" data-aown="${ownerMe ? "release" : "take"}">${ownerMe ? "Release" : x.owner ? "Take over" : "Take it"}</button>
+      ${x.reopened ? `<span class="ad-warn">Marked resolved, but it fired again ${esc(whenTxt(x.last))}.</span>` : ""}
+    </div>
+    <dl class="ad-facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    <div class="ad-occ"><span class="k">${esc(x.kind === "alert" ? "Occurrences · " + w.label : "Detected over " + w.label)}</span>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Occurrences">
+        <line x1="0" y1="${H - 1}" x2="${W}" y2="${H - 1}" stroke="var(--grid)"/>${occ}</svg>
+      <div class="tlabels"><span>${esc(whenTxt(w.start))}</span><span>${esc(whenTxt(w.end))}</span></div></div>
+    <div class="ad-thread">
+      <div class="k">Comments</div>
+      ${comments}
+      <form class="cm-form" data-acomment="${esc(x.key)}">
+        <textarea id="acomment" rows="2" placeholder="Add a comment"></textarea>
+        <button class="btn primary" type="submit">Comment</button>
+      </form>
+    </div>`;
+}
+
+/* ── actions ──────────────────────────────────────────────────────── */
+function setPage(p, quiet){
+  S.page = p === "anomalies" ? "anomalies" : "explorer";
+  document.getElementById("page-explorer").hidden = S.page !== "explorer";
+  document.getElementById("page-anomalies").hidden = S.page !== "anomalies";
+  try { history.replaceState(null, "", "#" + S.page); } catch (e) { /* sandboxed */ }
+  renderNav();
+  if (S.page === "anomalies"){ renderAnomalies(); if (!quiet) window.scrollTo(0, 0); }
+  else {
+    // charts drawn while the page was hidden measured nothing; draw them again
+    renderKpi(); lastCardsSig = ""; renderCards(); renderTables(); renderSessions();
+  }
+}
+function explainAnomaly(key){
+  const x = buildAnomalies().find(a => a.key === key);
+  if (!x) return;
+  S.anom.from = key;
+  setPage("explorer");
+  if (x.kind === "alert") openAlert(x.occ[0].id);
+  else applyFinding(x.findIdx);
+  renderNav();
+  window.scrollTo(0, 0);
+}
+function setAnomRange(r){
+  if (S.anom.range === r) return;
+  S.anom.range = r;
+  S.ins.stamp = null;
+  loadAlerts(); loadInsights(true);
+  renderAnomalies();
+}
+
 /* ── boot ─────────────────────────────────────────────── */
 try {
   const saved = JSON.parse(localStorage.getItem("minute-explorer:kdef") || "null");
@@ -6208,5 +6601,7 @@ function startAll(){
 /* Nothing to connect to, nothing to ask permission for, nothing that can be
    unavailable: draw the shell, then let the generated dataset fill it. */
 renderStatus();
+setPage(location.hash === "#anomalies" ? "anomalies" : "explorer", true);
 startAll();
+ASTORE.init();
 </script>
