@@ -810,6 +810,11 @@ select{
 .mrec-in.one .mrec-kv .k{font-family:var(--font-ui); font-size:11.5px}
 .mrec-in.one .mrec-kv .v{font-family:var(--font-ui); font-size:12.5px}
 details.mrec-wire{border-top:1px solid var(--border-soft); padding-top:8px}
+.ev-r.run{background:color-mix(in srgb, var(--good) 6%, transparent); grid-template-columns:150px 66px 150px 1fr}
+@media (max-width:900px){ .ev-r.run{grid-template-columns:132px 1fr} .ev-r.run .pb, .ev-r.run .ds{display:none} }
+.ev-r.run:hover{background:color-mix(in srgb, var(--good) 11%, transparent)}
+.ev-r.run .runtog{font-style:normal; color:var(--accent); margin-left:10px; font-size:11px}
+.ev-r.sub{padding-left:22px; opacity:.85}
 details.mrec-wire summary{cursor:pointer; font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em;
   text-transform:uppercase; color:var(--text-faint)}
 details.mrec-wire summary:hover{color:var(--text-dim)}
@@ -4848,18 +4853,81 @@ function timelineModel(d){
 }
 
 const issueNames = hits => hits.map(h => compMeta(h).l).join(", ");
+const secs = v => v < 10 ? v.toFixed(1) + " s" : dur(v);
+const bucketRange = b => secs(ObservaCore.rungLowerMs(b) / 1000) + "–" + secs(ObservaCore.rungUpperMs(b) / 1000);
 function minuteDetail(r){
   const C = ObservaCore, ic = r.issue_counters, parts = [];
   parts.push(r.content_intent_s + " s intent · " + r.content_active_s + " s active");
   if (r.ad_intent_s) parts.push("ad " + r.ad_intent_s + " s");
   if (ic.rebuffer_ms_bucket !== C.NO_BUCKET)
     parts.push(ic.rebuffer_count + " rebuffer" + (ic.rebuffer_count === 1 ? "" : "s") + " · " +
-      dur(C.rungLowerMs(ic.rebuffer_ms_bucket) / 1000) + "–" + dur(C.rungUpperMs(ic.rebuffer_ms_bucket) / 1000));
+      bucketRange(ic.rebuffer_ms_bucket));
   if (activeOf(r)) parts.push((C.bitrateBucketMidKbps(r.bitrate_bucket) / 1000).toFixed(2) + " Mbps · " + Math.round(100 * Math.min(1, r.peak_rendition_seconds / activeOf(r))) + "% at peak");
-  if (ic.startup_ms_bucket !== C.NO_BUCKET) parts.push("startup " + dur(C.rungLowerMs(ic.startup_ms_bucket) / 1000) + "+");
+  if (ic.startup_ms_bucket !== C.NO_BUCKET) parts.push("startup " + bucketRange(ic.startup_ms_bucket));
   if (r.context_change_flags & (1 << C.ContextChangeFlag.CDN_SWITCH)) parts.push("CDN switch");
   if (r.record_flags & (1 << C.RecordFlag.TERMINAL)) parts.push("terminal");
   return parts.join(" · ");
+}
+
+/* The minute list. A minute with issues, or a minute that never arrived, gets
+   its own row; a run of consecutive issue-free (or ineligible) minutes is one
+   row, because hours of identical healthy minutes are not something to read
+   one by one. A run expands in place when its minutes are wanted. */
+const openRuns = new Set();
+function minuteRuns(m){
+  const out = [];
+  m.slots.forEach(sl => {
+    const quiet = sl.state === "clean" || sl.state === "inelig";
+    const last = out[out.length - 1];
+    if (quiet && last && last.state === sl.state) last.slots.push(sl);
+    else out.push({state: sl.state, quiet, slots: [sl]});
+  });
+  return out;
+}
+function minuteRowHTML(sl, sub){
+  const cls = (sl.state === "issue" ? "crit" : sl.state === "gap" ? "warn" : "") + (sub ? " sub" : "");
+  const what = sl.state === "gap" ? "not received"
+             : sl.state === "inelig" ? "ineligible"
+             : sl.hits.length ? issueNames(sl.hits) : "issue-free";
+  return `<div class="ev-r ${cls}" data-mi="${sl.seq}">
+    <span class="tm">${esc(HH(sl.ts / 1000))}</span>
+    <span class="pb">#${sl.seq}</span>
+    <span class="nm" style="color:var(${MSTATE[sl.state].c})">${esc(what)}</span>
+    <span class="ds">${sl.r ? esc(minuteDetail(sl.r)) : "a hole in the sequence numbers — the backend knows it is missing"}</span>
+  </div>`;
+}
+function runSummary(run){
+  const C = ObservaCore, recs = run.slots.map(sl => sl.r).filter(Boolean);
+  let act = 0, peak = 0, kbps = 0, ads = 0;
+  const notes = [];
+  recs.forEach(r => {
+    const a = r.content_active_s + r.ad_active_s;
+    act += a; peak += r.peak_rendition_seconds; kbps += C.bitrateBucketMidKbps(r.bitrate_bucket) * a;
+    if (r.ad_intent_s) ads++;
+    if (r.context_change_flags & (1 << C.ContextChangeFlag.CDN_SWITCH)) notes.push("CDN switch at " + HH(r.minute_ts / 1000));
+    if (r.record_flags & (1 << C.RecordFlag.TERMINAL)) notes.push("ended " + HH(r.minute_ts / 1000));
+    if (r.issue_counters.startup_ms_bucket !== C.NO_BUCKET) notes.push("started " + HH(r.minute_ts / 1000));
+  });
+  const parts = [];
+  if (act) parts.push("avg " + (kbps / act / 1000).toFixed(2) + " Mbps", Math.round(100 * Math.min(1, peak / act)) + "% at peak");
+  if (ads) parts.push(ads + " with ads");
+  return parts.concat(notes).join(" · ");
+}
+function minuteListHTML(m, pid){
+  return minuteRuns(m).map(run => {
+    if (!run.quiet || run.slots.length < 2) return run.slots.map(sl => minuteRowHTML(sl)).join("");
+    const a = run.slots[0], b = run.slots[run.slots.length - 1];
+    const key = pid + ":" + a.seq, open = openRuns.has(key);
+    const n = run.slots.length;
+    const head = `<div class="ev-r run ${open ? "open" : ""}" data-run="${esc(key)}" data-from="${a.seq}" data-to="${b.seq}"
+        title="${open ? "Collapse these minutes" : "Show each of these minutes"}">
+      <span class="tm">${esc(HH(a.ts / 1000) + "–" + HH(b.ts / 1000))}</span>
+      <span class="pb">#${a.seq}–${b.seq}</span>
+      <span class="nm" style="color:var(${MSTATE[run.state].c})">${esc(n + " min " + (run.state === "clean" ? "issue-free" : "ineligible"))}</span>
+      <span class="ds">${esc(runSummary(run))}<i class="runtog">${open ? "hide minutes" : "show minutes"}</i></span>
+    </div>`;
+    return head + (open ? run.slots.map(sl => minuteRowHTML(sl, true)).join("") : "");
+  }).join("");
 }
 
 function timelineHTML(d, id){
@@ -4884,18 +4952,7 @@ function timelineHTML(d, id){
     `<span class="klg"><i style="background:var(${MSTATE[k].c})"></i>${esc(MSTATE[k].l)} <b>${m.counts[k]}</b></span>`).join("")
     + m.comps.map(k => `<span class="klg"><i style="background:var(${compMeta(k).c})"></i>${esc(compMeta(k).l)}</span>`).join("");
 
-  const rows = m.slots.slice(-240).map(sl => {
-    const cls = sl.state === "issue" ? "crit" : sl.state === "gap" ? "warn" : "";
-    const what = sl.state === "gap" ? "not received"
-               : sl.state === "inelig" ? "ineligible"
-               : sl.hits.length ? issueNames(sl.hits) : "issue-free";
-    return `<div class="ev-r ${cls}" data-mi="${sl.seq}">
-      <span class="tm">${esc(HH(sl.ts / 1000))}</span>
-      <span class="pb">#${sl.seq}</span>
-      <span class="nm" style="color:var(${MSTATE[sl.state].c})">${esc(what)}</span>
-      <span class="ds">${sl.r ? esc(minuteDetail(sl.r)) : "a hole in the sequence numbers — the backend knows it is missing"}</span>
-    </div>`;
-  }).join("");
+  const rows = minuteListHTML(m, d.sessionid);
 
   return `<div class="sdetail">
     <div class="spec">${spec.map(r => `<div><span class="k">${esc(r[0])}</span><span class="v" title="${esc(r[1])}">${esc(r[1])}</span></div>`).join("")}</div>
@@ -4928,7 +4985,7 @@ function minuteRecordHTML(d, seq){
     the playback's later sequence numbers bound it, so completeness reports a gap rather than a healthy minute.</div></div>`;
   const {debug, __score, ...wire} = r;
   const ic = wire.issue_counters, none = v => v === C.NO_BUCKET;
-  const range = b => dur(C.rungLowerMs(b) / 1000) + "–" + dur(C.rungUpperMs(b) / 1000);
+  const range = bucketRange;
   const sc = __score || {elig:true, hits:[]};
   const verdict = !sc.elig ? "ineligible: too little playback to score"
     : sc.hits.length ? "with issues: " + issueNames(sc.hits) : "issue-free";
@@ -5081,11 +5138,20 @@ function drawSessionTracks(){
       if (recBox) recBox.innerHTML = minuteRecordHTML(d, sl.seq);
       if (list){
         list.querySelectorAll(".ev-r.on").forEach(r2 => r2.classList.remove("on"));
-        const row = list.querySelector(`[data-mi="${sl.seq}"]`);
+        const row = list.querySelector(`[data-mi="${sl.seq}"]`) ||
+          [...list.querySelectorAll("[data-run]")].find(r2 => sl.seq >= +r2.dataset.from && sl.seq <= +r2.dataset.to);
         if (row){ row.classList.add("on"); if (!fromList) row.scrollIntoView({block:"nearest"}); }
       }
     };
     if (list) list.addEventListener("click", ev => {
+      const run = ev.target.closest("[data-run]");
+      if (run){
+        const key = run.getAttribute("data-run");
+        if (openRuns.has(key)) openRuns.delete(key); else openRuns.add(key);
+        list.innerHTML = minuteListHTML(m, d.sessionid);
+        if (selI != null) select(selI, true);
+        return;
+      }
       const row = ev.target.closest("[data-mi]");
       if (row) select(m.slots.findIndex(s2 => s2.seq === +row.getAttribute("data-mi")), true);
     });
