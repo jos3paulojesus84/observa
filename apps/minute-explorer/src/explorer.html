@@ -805,6 +805,14 @@ select{
 .mrec-kv .k{font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint)}
 .mrec-kv .v{font-family:var(--font-mono); font-size:11.5px; overflow-wrap:anywhere}
 .mrec-h{font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-faint)}
+.mrec-in.one{grid-template-columns:minmax(0,1fr)}
+.mrec-in.one .mrec-kv{grid-template-columns:max-content minmax(0,1fr); max-width:760px}
+.mrec-in.one .mrec-kv .k{font-family:var(--font-ui); font-size:11.5px}
+.mrec-in.one .mrec-kv .v{font-family:var(--font-ui); font-size:12.5px}
+details.mrec-wire{border-top:1px solid var(--border-soft); padding-top:8px}
+details.mrec-wire summary{cursor:pointer; font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--text-faint)}
+details.mrec-wire summary:hover{color:var(--text-dim)}
 .mrec-note{font-size:11.5px; color:var(--text-dim); margin-top:8px; line-height:1.5}
 .bytes{display:flex; flex-wrap:wrap; gap:3px; margin:8px 0}
 .byte{font:600 11.5px/1 var(--font-mono); padding:6px 0; width:27px; text-align:center; border-radius:4px;
@@ -986,7 +994,7 @@ const CUSTOM_FIELDS = [
   {k:"bitrate",      l:"Delivered bitrate",           unit:"Mbps", ops:["lt"],  fam:"qual",
    hint:"bitrate_bucket · time-weighted mean, ±4%"},
   {k:"peak_pct",     l:"Time at peak rendition",      unit:"%",    ops:["lt"],  fam:"qual",
-   hint:"peak_rendition_seconds ÷ active seconds"},
+   hint:"peak_rendition_seconds ÷ seconds on screen"},
   {k:"freeze_ms",    l:"Freeze time in the minute",   unit:"s",    ops:["gte"], fam:"frz",   bucketed:true,
    hint:"freeze_ms_bucket · log scale"},
 ];
@@ -2170,8 +2178,8 @@ const DEMO = (() => {
       case "rebuffer_n":  return m => ic(m).rebuffer_count >= v;
       case "freeze_ms":   { const b = C.clientBucket(v * 1000); return m => has(ic(m).freeze_ms_bucket) && ic(m).freeze_ms_bucket >= b; }
       case "startup_ms":  { const b = C.clientBucket(v * 1000); return m => has(ic(m).startup_ms_bucket) && ic(m).startup_ms_bucket >= b; }
-      case "bitrate":     return m => m.content_active_s >= 5 && C.bitrateBucketMidKbps(m.bitrate_bucket) / 1000 < v;
-      case "peak_pct":    return m => m.content_active_s >= 20 && 100 * m.peak_rendition_seconds / m.content_active_s < v;
+      case "bitrate":     return m => m.content_active_s + m.ad_active_s >= 5 && C.bitrateBucketMidKbps(m.bitrate_bucket) / 1000 < v;
+      case "peak_pct":    return m => m.content_active_s + m.ad_active_s >= 20 && 100 * m.peak_rendition_seconds / (m.content_active_s + m.ad_active_s) < v;
       default: return () => false;
     }
   }
@@ -2199,8 +2207,9 @@ const DEMO = (() => {
       const sc = score(m);
       if (sc.elig) elig++;
       if (sc.hits.length){ issue++; sc.hits.forEach(h => comps[h] = 1); }
-      activeS += m.content_active_s;
-      kbpsS += C.bitrateBucketMidKbps(m.bitrate_bucket) * m.content_active_s;
+      const act = m.content_active_s + m.ad_active_s;   // peak and bitrate are measured over all of it
+      activeS += act;
+      kbpsS += C.bitrateBucketMidKbps(m.bitrate_bucket) * act;
       peakS += m.peak_rendition_seconds;
       const rb = m.issue_counters.rebuffer_ms_bucket;
       if (rb !== C.NO_BUCKET){ rebMs += C.rungMidMs(rb); maxRebLo = Math.max(maxRebLo, C.rungLowerMs(rb) / 1000); }
@@ -4846,7 +4855,7 @@ function minuteDetail(r){
   if (ic.rebuffer_ms_bucket !== C.NO_BUCKET)
     parts.push(ic.rebuffer_count + " rebuffer" + (ic.rebuffer_count === 1 ? "" : "s") + " · " +
       dur(C.rungLowerMs(ic.rebuffer_ms_bucket) / 1000) + "–" + dur(C.rungUpperMs(ic.rebuffer_ms_bucket) / 1000));
-  if (r.content_active_s) parts.push((C.bitrateBucketMidKbps(r.bitrate_bucket) / 1000).toFixed(2) + " Mbps · " + r.peak_rendition_seconds + " s at peak");
+  if (activeOf(r)) parts.push((C.bitrateBucketMidKbps(r.bitrate_bucket) / 1000).toFixed(2) + " Mbps · " + Math.round(100 * Math.min(1, r.peak_rendition_seconds / activeOf(r))) + "% at peak");
   if (ic.startup_ms_bucket !== C.NO_BUCKET) parts.push("startup " + dur(C.rungLowerMs(ic.startup_ms_bucket) / 1000) + "+");
   if (r.context_change_flags & (1 << C.ContextChangeFlag.CDN_SWITCH)) parts.push("CDN switch");
   if (r.record_flags & (1 << C.RecordFlag.TERMINAL)) parts.push("terminal");
@@ -4881,7 +4890,7 @@ function timelineHTML(d, id){
                : sl.state === "inelig" ? "ineligible"
                : sl.hits.length ? issueNames(sl.hits) : "issue-free";
     return `<div class="ev-r ${cls}" data-mi="${sl.seq}">
-      <span class="tm">${esc(HHMS(sl.ts).slice(0, 5))}</span>
+      <span class="tm">${esc(HH(sl.ts / 1000))}</span>
       <span class="pb">#${sl.seq}</span>
       <span class="nm" style="color:var(${MSTATE[sl.state].c})">${esc(what)}</span>
       <span class="ds">${sl.r ? esc(minuteDetail(sl.r)) : "a hole in the sequence numbers — the backend knows it is missing"}</span>
@@ -4901,6 +4910,16 @@ function timelineHTML(d, id){
 }
 
 /* The record behind one minute, and the 24 bytes it travelled as. */
+/* Time at peak only means something against the time actually rendered: a
+   minute that played for 13 s cannot have more than 13 s at the top rung. The
+   SDK counts it over everything rendered, ads included, so that is the base. */
+const activeOf = r => r.content_active_s + r.ad_active_s;
+const peakText = r => activeOf(r) > 0
+  ? r.peak_rendition_seconds + " of " + activeOf(r) + " s on screen (" + Math.round(100 * Math.min(1, r.peak_rendition_seconds / activeOf(r))) + "%)"
+  : "nothing rendered";
+
+/* One minute, read in plain terms. The packed bytes are there for whoever
+   needs to check the encoding, folded away for everyone else. */
 function minuteRecordHTML(d, seq){
   const C = ObservaCore;
   const recs = (d.minuteRecords || []).slice().sort((a, b) => a.sequence_no - b.sequence_no);
@@ -4908,6 +4927,29 @@ function minuteRecordHTML(d, seq){
   if (!r) return `<div class="mrec-in"><div class="mrec-note">Minute #${seq} never reached the backend. Its absence is counted:
     the playback's later sequence numbers bound it, so completeness reports a gap rather than a healthy minute.</div></div>`;
   const {debug, __score, ...wire} = r;
+  const ic = wire.issue_counters, none = v => v === C.NO_BUCKET;
+  const range = b => dur(C.rungLowerMs(b) / 1000) + "–" + dur(C.rungUpperMs(b) / 1000);
+  const sc = __score || {elig:true, hits:[]};
+  const verdict = !sc.elig ? "ineligible: too little playback to score"
+    : sc.hits.length ? "with issues: " + issueNames(sc.hits) : "issue-free";
+  const bitNames = b => C.ISSUE_CODES.filter(c => b & (1 << C.IssueBit[c])).map(c => c.toLowerCase().replace(/_/g, " ")).join(", ");
+  const kv = [
+    ["Minute", HH(wire.minute_ts / 1000) + " · #" + wire.sequence_no],
+    ["Verdict", verdict],
+    ["Watching", wire.content_intent_s + " s trying · " + wire.content_active_s + " s on screen"],
+    ["Issue bits", bitNames(wire.content_issue_bitmap) || "none"],
+    ["Startup", none(ic.startup_ms_bucket) ? null : range(ic.startup_ms_bucket) + " (completed in this minute)"],
+    ["Rebuffering", none(ic.rebuffer_ms_bucket) ? "none" : ic.rebuffer_count + " × · " + range(ic.rebuffer_ms_bucket) + " in total"],
+    ["Freeze", none(ic.freeze_ms_bucket) ? null : ic.freeze_count + " × · " + range(ic.freeze_ms_bucket)],
+    ["Bitrate", activeOf(wire) ? "≈ " + (C.bitrateBucketMidKbps(wire.bitrate_bucket) / 1000).toFixed(2) + " Mbps" : null],
+    ["At peak", peakText(wire)],
+    ["Ads", wire.ad_intent_s ? wire.ad_active_s + " s on screen" + (wire.ad_issue_bitmap ? " · " + bitNames(wire.ad_issue_bitmap) : "") : null],
+    ["Errors", ic.error_count + ic.ad_error_count ? ic.error_count + " content · " + ic.ad_error_count + " ad" : null],
+    ["CDN switch", wire.context_change_flags & (1 << C.ContextChangeFlag.CDN_SWITCH) ? "yes · a context change, never an issue" : null],
+    ["Last minute", wire.record_flags & (1 << C.RecordFlag.TERMINAL) ? "yes · the playback ended here" : null],
+    ["Classified by", "ruleset " + wire.ruleset_version + " · threshold profile " + wire.threshold_profile_id],
+  ].filter(x => x[1] != null);
+
   const base = {base_minute_ts: recs[0].minute_ts - recs[0].sequence_no * 60000, base_sequence: 0};
   let bytes = null;
   try { bytes = C.packMinute(wire, base); } catch (e) { bytes = null; }
@@ -4915,33 +4957,17 @@ function minuteRecordHTML(d, seq){
     const seg = C.PACKED_LAYOUT.findIndex(l => k >= l.start && k < l.start + l.length);
     return `<span class="byte" style="--c:var(${PACKED_COLORS[seg]})" title="${esc(C.PACKED_LAYOUT[seg].name)}">${b.toString(16).padStart(2, "0")}</span>`;
   }).join("") : "";
-  const bits = b => C.ISSUE_CODES.filter(c => b & (1 << C.IssueBit[c])).join(" | ") || "none";
-  const ic = wire.issue_counters, B = v => v === C.NO_BUCKET ? "none" : v;
-  const kv = [
-    ["minute_ts", new Date(wire.minute_ts).toISOString().slice(0, 16) + "Z"], ["sequence_no", wire.sequence_no],
-    ["content intent / active", wire.content_intent_s + " / " + wire.content_active_s + " s"],
-    ["content_issue_bitmap", "0x" + wire.content_issue_bitmap.toString(16).padStart(2, "0") + " " + bits(wire.content_issue_bitmap)],
-    ["ad intent / active", wire.ad_intent_s + " / " + wire.ad_active_s + " s"],
-    ["ad_issue_bitmap", "0x" + wire.ad_issue_bitmap.toString(16).padStart(2, "0") + " " + bits(wire.ad_issue_bitmap)],
-    ["rebuffer count · bucket", ic.rebuffer_count + " · " + B(ic.rebuffer_ms_bucket)],
-    ["freeze count · bucket", ic.freeze_count + " · " + B(ic.freeze_ms_bucket)],
-    ["startup bucket", B(ic.startup_ms_bucket)], ["errors content · ad", ic.error_count + " · " + ic.ad_error_count],
-    ["bitrate_bucket", wire.bitrate_bucket + " ≈ " + (C.bitrateBucketMidKbps(wire.bitrate_bucket) / 1000).toFixed(2) + " Mbps"],
-    ["peak_rendition_seconds", wire.peak_rendition_seconds],
-    ["context_change_flags", wire.context_change_flags], ["record_flags", wire.record_flags],
-    ["policy", "taxonomy " + wire.taxonomy_version + " · profile " + wire.threshold_profile_id + " · ruleset " + wire.ruleset_version],
-  ];
-  const exact = debug ? `Measured exactly on the device: ${(debug.active_ms / 1000).toFixed(3)} s active, ${debug.rebuffer_ms.toLocaleString()} ms rebuffering${
+  const exact = debug ? `Measured exactly on the device: ${(debug.active_ms / 1000).toFixed(3)} s on screen, ${debug.rebuffer_ms.toLocaleString()} ms rebuffering${
     debug.mean_kbps ? ", " + (debug.mean_kbps / 1000).toFixed(3) + " Mbps mean" : ""}. Only the buckets travel.` : "";
   const slot = d.uploadS != null ? `Sealed at ${esc(HHMS(wire.minute_ts + 60000))}, uploaded ${d.uploadS} s later in this playback's stagger slot.` : "";
-  return `<div class="mrec-in">
+  return `<div class="mrec-in one">
     <div class="mrec-kv">${kv.map(([k, v]) => `<span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>`).join("")}</div>
-    <div class="mrec-wire">
-      <div class="mrec-h">On the wire · ${bytes ? bytes.length : 0} bytes</div>
+    ${bytes ? `<details class="mrec-wire">
+      <summary>Wire format · ${bytes.length} bytes</summary>
       <div class="bytes">${hex}</div>
       <div class="bytelegend">${C.PACKED_LAYOUT.map((l, k) => `<span><i style="--c:var(${PACKED_COLORS[k]})"></i>${esc(l.name)} · ${l.length} B</span>`).join("")}</div>
       <div class="mrec-note">${esc(exact)} ${slot} Identity and policy travel once in the batch header.</div>
-    </div>
+    </details>` : ""}
   </div>`;
 }
 
@@ -4993,10 +5019,11 @@ function drawSessionTracks(){
       <rect x="${(x(i) + gap / 2).toFixed(1)}" y="${ry(rb.lo).toFixed(1)}" width="${Math.max(1, cw - gap).toFixed(1)}" height="${Math.max(0, ry(0) - ry(rb.lo)).toFixed(1)}" fill="var(--s2)" opacity=".28"/>` : "").join("")
       + `<line x1="0" y1="${ry(0)}" x2="${W}" y2="${ry(0)}" stroke="var(--grid)"/><text x="2" y="9" class="tv">${esc(dur(rHi))}</text>`;
 
-    // 5 · seconds at peak rendition
-    const PH = 26, pk = m.slots.map(sl => sl.r ? sl.r.peak_rendition_seconds : null);
-    const pkG = pk.map((v, i) => v == null ? "" : `<rect x="${(x(i) + gap / 2).toFixed(1)}" y="${(PH - 2 - v / 60 * (PH - 4)).toFixed(1)}"
-      width="${Math.max(1, cw - gap).toFixed(1)}" height="${(v / 60 * (PH - 4)).toFixed(1)}" fill="var(--s3)" opacity=".75"/>`).join("");
+    // 5 · share of the rendered seconds spent at the top rung
+    const PH = 26, pk = m.slots.map(sl => sl.r && activeOf(sl.r) > 0 ? Math.min(1, sl.r.peak_rendition_seconds / activeOf(sl.r)) : null);
+    const pkG = pk.map((v, i) => v == null ? "" : `<rect x="${(x(i) + gap / 2).toFixed(1)}" y="${(PH - 2 - v * (PH - 4)).toFixed(1)}"
+      width="${Math.max(1, cw - gap).toFixed(1)}" height="${(v * (PH - 4)).toFixed(1)}" fill="var(--s3)" opacity=".75"/>`).join("")
+      + `<text x="2" y="9" class="tv">100%</text>`;
 
     // 6 · what was playing: content and ad intervals
     const span = Math.max(1, m.t1 - m.t0);
@@ -5020,9 +5047,9 @@ function drawSessionTracks(){
          <span class="tr-s hint">hover a minute to read it · click to open its record</span>
          <span class="tr-e"></span></div><div class="tcursor"></div>` +
       `<div class="trk"><span class="trk-l"></span>
-        <div class="tlabels"><span>${esc(HHMS(m.t0).slice(0, 5))}</span>
+        <div class="tlabels"><span>${esc(HH(m.t0 / 1000))}</span>
           <span>${esc(n + " minute" + (n === 1 ? "" : "s") + (m.counts.gap ? " · " + m.counts.gap + " not received" : ""))}</span>
-          <span>${esc(HHMS(m.t1).slice(0, 5))}</span></div></div>`;
+          <span>${esc(HH(m.t1 / 1000))}</span></div></div>`;
 
     const cursor = host.querySelector(".tcursor"), sel = host.querySelector(".tsel"), rd = host.querySelector(".treadout");
     const rdT = rd.querySelector(".tr-t"), rdS = rd.querySelector(".tr-s"), rdE = rd.querySelector(".tr-e");
@@ -5036,7 +5063,7 @@ function drawSessionTracks(){
     };
     const show = i => {
       const sl = m.slots[i]; if (!sl) return;
-      rdT.textContent = HHMS(sl.ts).slice(0, 5) + " · #" + sl.seq;
+      rdT.textContent = HH(sl.ts / 1000) + " · #" + sl.seq;
       rdS.className = "tr-s";
       rdS.innerHTML = `<i class="sw" style="background:var(${MSTATE[sl.state].c})"></i>${esc(sl.state === "issue" ? issueNames(sl.hits) : MSTATE[sl.state].l)}`;
       rdE.textContent = sl.r ? minuteDetail(sl.r) : "not received";
